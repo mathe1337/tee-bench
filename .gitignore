@@ -27,3 +27,5 @@ FHE/compile_commands.json
 FHE/CTestTestfile.cmake
 FHE/_deps
 FHE/build
+cmake-*
+/CMakeLists.txt

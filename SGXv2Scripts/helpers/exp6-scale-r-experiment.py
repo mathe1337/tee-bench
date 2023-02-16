@@ -19,7 +19,7 @@ def run_join(prog, alg, size_r, size_s, threads, reps, mode):
     f = open(filename, "a")
     results = []
     ewbs = []
-    for i in range(0,reps):
+    for i in range(0, reps):
         stdout = subprocess.check_output(prog + " -a " + alg + " -r " + str(size_r) + " -s " + str(size_s) +
                                          " -n " + str(threads), cwd="../../", shell=True) \
             .decode('utf-8')
@@ -27,7 +27,7 @@ def run_join(prog, alg, size_r, size_s, threads, reps, mode):
             if "Throughput" in line:
                 throughput = re.findall("\d+\.\d+", line)[1]
                 results.append(float(throughput))
-                print ("Throughput = " + str(throughput))
+                print("Throughput = " + str(throughput))
             elif "EWB :" in line:
                 ewb = int(re.findall(r'\d+', line)[-2])
                 print("EWB = " + str(ewb))
@@ -38,9 +38,9 @@ def run_join(prog, alg, size_r, size_s, threads, reps, mode):
         ewbs = [-1]
     res = statistics.mean(results)
     ewb = int(statistics.mean(ewbs))
-    s = (mode + "," + alg + "," + str(threads) + "," + str(round(size_r/mb_of_data,2)) +
-         "," + str(round(size_s/mb_of_data,2)) + "," + str(round(res,2)) + "," + str(ewb))
-    print ("AVG : " + s)
+    s = (mode + "," + alg + "," + str(threads) + "," + str(round(size_r / mb_of_data, 2)) +
+         "," + str(round(size_s / mb_of_data, 2)) + "," + str(round(res, 2)) + "," + str(ewb))
+    print("AVG : " + s)
     f.write(s + "\n")
     f.close()
 
@@ -55,10 +55,11 @@ def plot():
     csvf = open(filename, mode='r')
     csvr = csv.DictReader(csvf)
     all_data = list(csvr)
-    r_sizes = sorted(set(map(lambda x:float(x['sizeR']), all_data)))
-    s_sizes = sorted(set(map(lambda x:float(x['sizeS']), all_data)))
-    algos = sorted(set(map(lambda x:x['alg'], all_data)))
-    splitted = [[[y['alg'], y['sizeR'], y['sizeS'], y['throughput']] for y in all_data if y['sizeS'] == str(x)] for x in s_sizes]
+    r_sizes = sorted(set(map(lambda x: float(x['sizeR']), all_data)))
+    s_sizes = sorted(set(map(lambda x: float(x['sizeS']), all_data)))
+    algos = sorted(set(map(lambda x: x['alg'], all_data)))
+    splitted = [[[y['alg'], y['sizeR'], y['sizeS'], y['throughput']] for y in all_data if y['sizeS'] == str(x)] for x in
+                s_sizes]
     titles = ['S < L2', 'L2 < S < L3', 'L3 < S < EPC', 'EPC < S']
     # fig,a = plt.subplots(3,2,figsize=(10,5))
     # for i in range(0, len(s_sizes)):
@@ -100,14 +101,14 @@ def plot():
     # commons.savefig('img/scale-r-algos.png')
 
     # print only CHT
-    fig = plt.figure(figsize=(4,3))
+    fig = plt.figure(figsize=(4, 3))
     # plt.clf()
     data = list(filter(lambda x: x['alg'] == 'CHT', all_data))
     data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
     markers = ['o', 'v', 'D', 's']
     for i in range(0, len(s_sizes)):
         x_sizes = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-        x_sizes = sorted(set(map(lambda x:float(x['sizeR']), x_sizes)))
+        x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
         plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
                  label=s_sizes_names[i], color=commons.color_size(i), linewidth=2,
                  marker=markers[i], markersize=8, markeredgecolor='black',
@@ -115,7 +116,7 @@ def plot():
     # plt.legend(fontsize='small')
     lines, labels = fig.axes[-1].get_legend_handles_labels()
     fig.legend(lines, labels, fontsize='x-small', frameon=0,
-               ncol=2, bbox_to_anchor = (0.05, 0.95), loc='lower left', borderaxespad=0)
+               ncol=2, bbox_to_anchor=(0.05, 0.95), loc='lower left', borderaxespad=0)
     plt.gca().yaxis.grid(linestyle='dashed')
     plt.xlabel('Size of outer table [MB]')
     plt.ylabel('Throughput [M rec/s]')
@@ -141,13 +142,14 @@ def plot():
     # # plt.ylim([0,70])
     # commons.savefig('img/scale-r-PHT.png')
 
+
 def plot_with_ewb():
     csvf = open(filename, mode='r')
     csvr = csv.DictReader(csvf)
     all_data = list(csvr)
-    r_sizes = sorted(set(map(lambda x:float(x['sizeR']), all_data)))
-    s_sizes = sorted(set(map(lambda x:float(x['sizeS']), all_data)))
-    algos = sorted(set(map(lambda x:x['alg'], all_data)))
+    r_sizes = sorted(set(map(lambda x: float(x['sizeR']), all_data)))
+    s_sizes = sorted(set(map(lambda x: float(x['sizeS']), all_data)))
+    algos = sorted(set(map(lambda x: x['alg'], all_data)))
     splitted = [[y for y in all_data if y['sizeS'] == str(x)] for x in s_sizes]
     titles = ['S < L2', 'L2 < S < L3', 'L3 < S < EPC', 'EPC < S']
     width = 1
@@ -192,19 +194,19 @@ def plot_with_ewb():
     # plot only CHT for EPC < S
     # fig, ax1 = plt.subplots(figsize=(5,4))
     # plt.clf()
-    fig = plt.figure(figsize=(5,4))
+    fig = plt.figure(figsize=(5, 4))
     ax1 = plt.gca()
     # plt.clf()
     data = list(filter(lambda x: x['alg'] == 'CHT' and x['sizeS'] == '100.0', all_data))
     rs = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-    rs = sorted(set(map(lambda x:float(x['sizeR']), rs)))
+    rs = sorted(set(map(lambda x: float(x['sizeR']), rs)))
     plot = list(map(lambda x: float(x['throughput']), data))
-    bar = list(map(lambda x: int(float(x['ewb'])/1000), data))
+    bar = list(map(lambda x: int(float(x['ewb']) / 1000), data))
     line1, = ax1.plot(rs, plot, color=commons.color_alg('CHT'), linewidth=2,
                       marker=commons.marker_alg('CHT'), markeredgecolor='black', markersize=8, label='Throughput')
     ax1.set_xlabel('Size of outer table [MB]')
     ax1.set_ylabel('Throughput [M rec/s]')
-    ax1.set_xlim([0,130])
+    ax1.set_xlim([0, 130])
     ax1.set_ylim(bottom=0)
     ax2 = ax1.twinx()
     bar2 = ax2.bar(rs, bar, color=commons.color_size(3), alpha=0.4, width=3,
@@ -213,9 +215,9 @@ def plot_with_ewb():
     ax2.set_ylim(bottom=0)
     ax1.yaxis.grid(linestyle='dashed')
     ax1.axvline(x=90, linestyle='--', color='#209bb4', linewidth=2)
-    fig.text(0.55,0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
+    fig.text(0.55, 0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
     fig.legend(handles=[line1, bar2], ncol=2, frameon=False,
-               bbox_to_anchor=(0.08,0.91,1,0), loc="lower left")
+               bbox_to_anchor=(0.08, 0.91, 1, 0), loc="lower left")
     commons.savefig('../img/Figure-05-CHTs-throughput-and-EPC-paging.png')
 
 
@@ -225,7 +227,7 @@ if __name__ == '__main__':
         config = yaml.safe_load(file)
         argv = sys.argv[1:]
         try:
-            opts, args = getopt.getopt(argv, 'r:',['reps='])
+            opts, args = getopt.getopt(argv, 'r:', ['reps='])
         except getopt.GetoptError:
             print('Unknown argument')
             sys.exit(1)
@@ -235,19 +237,19 @@ if __name__ == '__main__':
 
     mode = "sgx"
     max_r_size_mb = 128
-    s_sizes = [int(0.2*mb_of_data),   # ~205kB
-               int(6.4 * mb_of_data), # 6.4 MB
-               16 * mb_of_data,       # 16 MB
-               100 * mb_of_data]      # 100 MB
+    s_sizes = [int(0.2 * mb_of_data),  # ~205kB
+               int(6.4 * mb_of_data),  # 6.4 MB
+               16 * mb_of_data,  # 16 MB
+               100 * mb_of_data]  # 100 MB
 
     if config['experiment']:
-        commons.compile_app(mode, flags=["SGX_COUNTERS"])
+        commons.compile_app(mode)  # , flags=["SGX_COUNTERS"])
         commons.remove_file(filename)
         commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
         for s_size in s_sizes:
-            for alg in ['CHT']:#commons.get_all_algorithms():
-                for i in range(8, max_r_size_mb+1, 8):
+            for alg in ['CHT']:  # commons.get_all_algorithms():
+                for i in range(8, max_r_size_mb + 1, 8):
                     run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode)
 
     plot()
