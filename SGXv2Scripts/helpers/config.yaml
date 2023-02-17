@@ -1,4 +1,4 @@
-reps : 5
+reps : 2
 threads: 4
 modes:
   - native

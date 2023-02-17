@@ -49,8 +49,8 @@ def plot():
     s_sizes_names = [
         '$S_{size}$ < L2',
         'L2 < $S_{size}$ < L3',
-        'L3 < $S_{size}$ < EPC',
-        'EPC < $S_{size}$'
+        'L3 < $S_{size}$',
+        'L3 << $S_{size}$'
     ]
     csvf = open(filename, mode='r')
     csvr = csv.DictReader(csvf)
@@ -60,7 +60,7 @@ def plot():
     algos = sorted(set(map(lambda x: x['alg'], all_data)))
     splitted = [[[y['alg'], y['sizeR'], y['sizeS'], y['throughput']] for y in all_data if y['sizeS'] == str(x)] for x in
                 s_sizes]
-    titles = ['S < L2', 'L2 < S < L3', 'L3 < S < EPC', 'EPC < S']
+    titles = ['S < L2', 'L2 < S < L3', 'L3 < S', 'L3 << S']
     # fig,a = plt.subplots(3,2,figsize=(10,5))
     # for i in range(0, len(s_sizes)):
     #     ds = splitted[i]
@@ -151,7 +151,7 @@ def plot_with_ewb():
     s_sizes = sorted(set(map(lambda x: float(x['sizeS']), all_data)))
     algos = sorted(set(map(lambda x: x['alg'], all_data)))
     splitted = [[y for y in all_data if y['sizeS'] == str(x)] for x in s_sizes]
-    titles = ['S < L2', 'L2 < S < L3', 'L3 < S < EPC', 'EPC < S']
+    titles = ['S < L2', 'L2 < S < L3', 'L3 < S', 'L3 << S']
     width = 1
     # fig,ax1 = plt.subplots(2,2,figsize=(20,10))
     # for i in range(0, len(s_sizes)):
@@ -194,31 +194,31 @@ def plot_with_ewb():
     # plot only CHT for EPC < S
     # fig, ax1 = plt.subplots(figsize=(5,4))
     # plt.clf()
-    fig = plt.figure(figsize=(5, 4))
-    ax1 = plt.gca()
+    #fig = plt.figure(figsize=(5, 4))
+    #ax1 = plt.gca()
     # plt.clf()
-    data = list(filter(lambda x: x['alg'] == 'CHT' and x['sizeS'] == '100.0', all_data))
-    rs = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-    rs = sorted(set(map(lambda x: float(x['sizeR']), rs)))
-    plot = list(map(lambda x: float(x['throughput']), data))
-    bar = list(map(lambda x: int(float(x['ewb']) / 1000), data))
-    line1, = ax1.plot(rs, plot, color=commons.color_alg('CHT'), linewidth=2,
-                      marker=commons.marker_alg('CHT'), markeredgecolor='black', markersize=8, label='Throughput')
-    ax1.set_xlabel('Size of outer table [MB]')
-    ax1.set_ylabel('Throughput [M rec/s]')
-    ax1.set_xlim([0, 130])
-    ax1.set_ylim(bottom=0)
-    ax2 = ax1.twinx()
-    bar2 = ax2.bar(rs, bar, color=commons.color_size(3), alpha=0.4, width=3,
-                   label='EPC Miss')
-    ax2.set_ylabel('EPC Miss [k]')
-    ax2.set_ylim(bottom=0)
-    ax1.yaxis.grid(linestyle='dashed')
-    ax1.axvline(x=90, linestyle='--', color='#209bb4', linewidth=2)
-    fig.text(0.55, 0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
-    fig.legend(handles=[line1, bar2], ncol=2, frameon=False,
-               bbox_to_anchor=(0.08, 0.91, 1, 0), loc="lower left")
-    commons.savefig('../img/Figure-05-CHTs-throughput-and-EPC-paging.png')
+    #data = list(filter(lambda x: x['alg'] == 'CHT' and x['sizeS'] == '100.0', all_data))
+    #rs = list(filter(lambda x: x['alg'] == 'CHT', all_data))
+    #rs = sorted(set(map(lambda x: float(x['sizeR']), rs)))
+   # plot = list(map(lambda x: float(x['throughput']), data))
+    #bar = list(map(lambda x: int(float(x['ewb']) / 1000), data))
+    #line1, = ax1.plot(rs, plot, color=commons.color_alg('CHT'), linewidth=2,
+      #                marker=commons.marker_alg('CHT'), markeredgecolor='black', markersize=8, label='Throughput')
+    #ax1.set_xlabel('Size of outer table [MB]')
+    #ax1.set_ylabel('Throughput [M rec/s]')
+    #ax1.set_xlim([0, 130])
+    #ax1.set_ylim(bottom=0)
+    #ax2 = ax1.twinx()
+    #bar2 = ax2.bar(rs, bar, color=commons.color_size(3), alpha=0.4, width=3,
+     #              label='EPC Miss')
+    #ax2.set_ylabel('EPC Miss [k]')
+    #ax2.set_ylim(bottom=0)
+    #ax1.yaxis.grid(linestyle='dashed')
+    #ax1.axvline(x=90, linestyle='--', color='#209bb4', linewidth=2)
+    #fig.text(0.55, 0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
+    #fig.legend(handles=[line1, bar2], ncol=2, frameon=False,
+     #          bbox_to_anchor=(0.08, 0.91, 1, 0), loc="lower left")
+    #commons.savefig('../img/Figure-05-CHTs-throughput-and-EPC-paging.png')
 
 
 if __name__ == '__main__':
@@ -236,22 +236,22 @@ if __name__ == '__main__':
                 config['reps'] = int(arg)
 
     mode = "sgx"
-    max_r_size_mb = 128
-    s_sizes = [int(0.2 * mb_of_data),  # ~205kB
-               int(6.4 * mb_of_data),  # 6.4 MB
-               16 * mb_of_data,  # 16 MB
-               100 * mb_of_data]  # 100 MB
+    max_r_size_mb = 5000
+    s_sizes = [int(1 * mb_of_data),  # 1.2MB
+               int(20 * mb_of_data),  # 24 MB
+               28 * mb_of_data,  # 16 MB
+               512 * mb_of_data]  # 100 MB
 
     if config['experiment']:
-        commons.compile_app(mode)  # , flags=["SGX_COUNTERS"])
+        commons.compile_app(mode, enclave_config_file='Enclave/Enclave8GB.config.xml')  # , flags=["SGX_COUNTERS"])
         commons.remove_file(filename)
         commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
         for s_size in s_sizes:
             for alg in ['CHT']:  # commons.get_all_algorithms():
-                for i in range(8, max_r_size_mb + 1, 8):
+                for i in range(1000, max_r_size_mb + 1, 1000):
                     run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode)
 
     plot()
-    plot_with_ewb()
+    #plot_with_ewb()
     commons.stop_timer(timer)
