@@ -98,9 +98,7 @@ def plot():
         plt.ylabel('Throughput [M rec/s]')
         plt.title(alg)
         plt.ylim([0, 70])
-
-
-commons.savefig('img/scale-r-algos.png')
+    commons.savefig('img/scale-r-algos.png')
 
 # print only CHT
 # fig = plt.figure(figsize=(4, 3))
