@@ -80,67 +80,69 @@ def plot():
     # commons.savefig('img/scale-r.png')
 
     # print graphs per algorithm
-    # fig = plt.figure(figsize=(8,6))
-    # plt.clf()
-    # for alg in algos:
-    #     data = list(filter(lambda x: x['alg'] == alg, all_data))
-    #     data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
-    #     plt.subplot(3,2,algos.index(alg)+1)
-    #     for i in range(0, len(s_sizes)):
-    #         x_sizes = list(filter(lambda x: x['alg'] == alg, all_data))
-    #         x_sizes = sorted(set(map(lambda x:float(x['sizeR']), x_sizes)))
-    #         plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
-    #                  '-o', label=s_sizes_names[i], color=commons.color_size(i))
-    #     if alg == 'PHT':
-    #         plt.legend()
-    #     plt.gca().yaxis.grid(linestyle='dashed')
-    #     plt.xlabel('R size [MB]')
-    #     plt.ylabel('Throughput [M rec/s]')
-    #     plt.title(alg)
-    #     plt.ylim([0,70])
-    # commons.savefig('img/scale-r-algos.png')
+    fig = plt.figure(figsize=(8, 6))
+    plt.clf()
+    for alg in algos:
+        data = list(filter(lambda x: x['alg'] == alg, all_data))
+        data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
+        plt.subplot(3, 2, algos.index(alg) + 1)
+        for i in range(0, len(s_sizes)):
+            x_sizes = list(filter(lambda x: x['alg'] == alg, all_data))
+            x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
+            plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
+                     '-o', label=s_sizes_names[i], color=commons.color_size(i))
+        if alg == 'PHT':
+            plt.legend()
+        plt.gca().yaxis.grid(linestyle='dashed')
+        plt.xlabel('R size [MB]')
+        plt.ylabel('Throughput [M rec/s]')
+        plt.title(alg)
+        plt.ylim([0, 70])
 
-    # print only CHT
-    fig = plt.figure(figsize=(4, 3))
-    # plt.clf()
-    data = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-    data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
-    markers = ['o', 'v', 'D', 's']
-    for i in range(0, len(s_sizes)):
-        x_sizes = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-        x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
-        plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
-                 label=s_sizes_names[i], color=commons.color_size(i), linewidth=2,
-                 marker=markers[i], markersize=8, markeredgecolor='black',
-                 markeredgewidth=0.3)
-    # plt.legend(fontsize='small')
-    lines, labels = fig.axes[-1].get_legend_handles_labels()
-    fig.legend(lines, labels, fontsize='x-small', frameon=0,
-               ncol=2, bbox_to_anchor=(0.05, 0.95), loc='lower left', borderaxespad=0)
-    plt.gca().yaxis.grid(linestyle='dashed')
-    plt.xlabel('Size of outer table [MB]')
-    plt.ylabel('Throughput [M rec/s]')
-    plt.xlim(left=0)
-    plt.ylim(bottom=0)
-    commons.savefig('../img/Figure-16-CHTs-throughput-scaling-the-outer-relation.png')
 
-    # print only PHT
-    # fig = plt.figure(figsize=(4,4))
-    # plt.clf()
-    # data = list(filter(lambda x: x['alg'] == 'PHT', all_data))
-    # data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
-    # for i in range(0, len(s_sizes)):
-    #     x_sizes = list(filter(lambda x: x['alg'] == 'PHT', all_data))
-    #     x_sizes = sorted(set(map(lambda x:float(x['sizeR']), x_sizes)))
-    #     plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
-    #              '-o', label=s_sizes_names[i], color=commons.color_size(i))
-    # plt.legend(fontsize='small')
-    # plt.gca().yaxis.grid(linestyle='dashed')
-    # plt.xlabel('R size [MB]')
-    # plt.ylabel('Throughput [M rec/s]')
-    # plt.title('PHT')
-    # # plt.ylim([0,70])
-    # commons.savefig('img/scale-r-PHT.png')
+commons.savefig('img/scale-r-algos.png')
+
+# print only CHT
+# fig = plt.figure(figsize=(4, 3))
+# plt.clf()
+# data = list(filter(lambda x: x['alg'] == 'CHT', all_data))
+# data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
+# markers = ['o', 'v', 'D', 's']
+# for i in range(0, len(s_sizes)):
+#    x_sizes = list(filter(lambda x: x['alg'] == 'CHT', all_data))
+#     x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
+#    plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
+#             label=s_sizes_names[i], color=commons.color_size(i), linewidth=2,
+#             marker=markers[i], markersize=8, markeredgecolor='black',
+#              markeredgewidth=0.3)
+# plt.legend(fontsize='small')
+# lines, labels = fig.axes[-1].get_legend_handles_labels()
+# fig.legend(lines, labels, fontsize='x-small', frameon=0,
+# ncol = 2, bbox_to_anchor = (0.05, 0.95), loc = 'lower left', borderaxespad = 0)
+# plt.gca().yaxis.grid(linestyle='dashed')
+# plt.xlabel('Size of outer table [MB]')
+# plt.ylabel('Throughput [M rec/s]')
+# plt.xlim(left=0)
+# plt.ylim(bottom=0)
+# commons.savefig('../img/Figure-16-CHTs-throughput-scaling-the-outer-relation.png')
+
+# print only PHT
+# fig = plt.figure(figsize=(4,4))
+# plt.clf()
+# data = list(filter(lambda x: x['alg'] == 'PHT', all_data))
+# data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
+# for i in range(0, len(s_sizes)):
+#     x_sizes = list(filter(lambda x: x['alg'] == 'PHT', all_data))
+#     x_sizes = sorted(set(map(lambda x:float(x['sizeR']), x_sizes)))
+#     plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
+#              '-o', label=s_sizes_names[i], color=commons.color_size(i))
+# plt.legend(fontsize='small')
+# plt.gca().yaxis.grid(linestyle='dashed')
+# plt.xlabel('R size [MB]')
+# plt.ylabel('Throughput [M rec/s]')
+# plt.title('PHT')
+# # plt.ylim([0,70])
+# commons.savefig('img/scale-r-PHT.png')
 
 
 def plot_with_ewb():
@@ -194,31 +196,33 @@ def plot_with_ewb():
     # plot only CHT for EPC < S
     # fig, ax1 = plt.subplots(figsize=(5,4))
     # plt.clf()
-    #fig = plt.figure(figsize=(5, 4))
-    #ax1 = plt.gca()
+    # fig = plt.figure(figsize=(5, 4))
+    # ax1 = plt.gca()
     # plt.clf()
-    #data = list(filter(lambda x: x['alg'] == 'CHT' and x['sizeS'] == '100.0', all_data))
-    #rs = list(filter(lambda x: x['alg'] == 'CHT', all_data))
-    #rs = sorted(set(map(lambda x: float(x['sizeR']), rs)))
-   # plot = list(map(lambda x: float(x['throughput']), data))
-    #bar = list(map(lambda x: int(float(x['ewb']) / 1000), data))
-    #line1, = ax1.plot(rs, plot, color=commons.color_alg('CHT'), linewidth=2,
-      #                marker=commons.marker_alg('CHT'), markeredgecolor='black', markersize=8, label='Throughput')
-    #ax1.set_xlabel('Size of outer table [MB]')
-    #ax1.set_ylabel('Throughput [M rec/s]')
-    #ax1.set_xlim([0, 130])
-    #ax1.set_ylim(bottom=0)
-    #ax2 = ax1.twinx()
-    #bar2 = ax2.bar(rs, bar, color=commons.color_size(3), alpha=0.4, width=3,
-     #              label='EPC Miss')
-    #ax2.set_ylabel('EPC Miss [k]')
-    #ax2.set_ylim(bottom=0)
-    #ax1.yaxis.grid(linestyle='dashed')
-    #ax1.axvline(x=90, linestyle='--', color='#209bb4', linewidth=2)
-    #fig.text(0.55, 0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
-    #fig.legend(handles=[line1, bar2], ncol=2, frameon=False,
-     #          bbox_to_anchor=(0.08, 0.91, 1, 0), loc="lower left")
-    #commons.savefig('../img/Figure-05-CHTs-throughput-and-EPC-paging.png')
+    # data = list(filter(lambda x: x['alg'] == 'CHT' and x['sizeS'] == '100.0', all_data))
+    # rs = list(filter(lambda x: x['alg'] == 'CHT', all_data))
+    # rs = sorted(set(map(lambda x: float(x['sizeR']), rs)))
+
+
+# plot = list(map(lambda x: float(x['throughput']), data))
+# bar = list(map(lambda x: int(float(x['ewb']) / 1000), data))
+# line1, = ax1.plot(rs, plot, color=commons.color_alg('CHT'), linewidth=2,
+#                marker=commons.marker_alg('CHT'), markeredgecolor='black', markersize=8, label='Throughput')
+# ax1.set_xlabel('Size of outer table [MB]')
+# ax1.set_ylabel('Throughput [M rec/s]')
+# ax1.set_xlim([0, 130])
+# ax1.set_ylim(bottom=0)
+# ax2 = ax1.twinx()
+# bar2 = ax2.bar(rs, bar, color=commons.color_size(3), alpha=0.4, width=3,
+#              label='EPC Miss')
+# ax2.set_ylabel('EPC Miss [k]')
+# ax2.set_ylim(bottom=0)
+# ax1.yaxis.grid(linestyle='dashed')
+# ax1.axvline(x=90, linestyle='--', color='#209bb4', linewidth=2)
+# fig.text(0.55, 0.77, "EPC", color='#209bb4', rotation=90, weight='bold')
+# fig.legend(handles=[line1, bar2], ncol=2, frameon=False,
+#          bbox_to_anchor=(0.08, 0.91, 1, 0), loc="lower left")
+# commons.savefig('../img/Figure-05-CHTs-throughput-and-EPC-paging.png')
 
 
 if __name__ == '__main__':
@@ -237,21 +241,21 @@ if __name__ == '__main__':
 
     mode = "sgx"
     max_r_size_mb = 5000
-    s_sizes = [int(1 * mb_of_data),  # 1.2MB
-               int(20 * mb_of_data),  # 24 MB
-               28 * mb_of_data,  # 16 MB
-               512 * mb_of_data]  # 100 MB
+    s_sizes = [1 * mb_of_data,  # 1MB
+               20 * mb_of_data,  # 20 MB
+               28 * mb_of_data,  # 28 MB
+               512 * mb_of_data]  # 512 MB
 
     if config['experiment']:
-        commons.compile_app(mode, enclave_config_file='Enclave/Enclave8GB.config.xml')  # , flags=["SGX_COUNTERS"])
+        commons.compile_app(mode, enclave_config_file='Enclave/Enclave32GB.config.xml')  # , flags=["SGX_COUNTERS"])
         commons.remove_file(filename)
         commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
         for s_size in s_sizes:
-            for alg in ['CHT']:  # commons.get_all_algorithms():
+            for alg in commons.get_all_algorithms():
                 for i in range(1000, max_r_size_mb + 1, 1000):
                     run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode)
 
     plot()
-    #plot_with_ewb()
+    # plot_with_ewb()
     commons.stop_timer(timer)
