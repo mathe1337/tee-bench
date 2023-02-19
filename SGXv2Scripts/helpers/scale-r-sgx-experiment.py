@@ -11,7 +11,7 @@ import subprocess
 import csv
 import matplotlib.pyplot as plt
 
-filename = "../data/scale-r-output.csv"
+filename = "../data/scale-r-sgx-output.csv"
 mb_of_data = 131072
 
 
@@ -85,7 +85,7 @@ def plot():
     for alg in algos:
         data = list(filter(lambda x: x['alg'] == alg, all_data))
         data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
-        plt.subplot(3, 2, algos.index(alg) + 1)
+        plt.subplot(3, 3, algos.index(alg) +1)
         for i in range(0, len(s_sizes)):
             x_sizes = list(filter(lambda x: x['alg'] == alg, all_data))
             x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
@@ -97,8 +97,8 @@ def plot():
         plt.xlabel('R size [MB]')
         plt.ylabel('Throughput [M rec/s]')
         plt.title(alg)
-        plt.ylim([0, 70])
-    commons.savefig('img/scale-r-algos.png')
+        #plt.ylim([0, 70])
+    commons.savefig('../img/scale-r-sgx-algos.png')
 
 # print only CHT
 # fig = plt.figure(figsize=(4, 3))
