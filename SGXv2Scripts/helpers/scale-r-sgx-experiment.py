@@ -91,8 +91,8 @@ def plot():
             x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
             plt.plot(x_sizes, list(map(lambda x: float(x['throughput']), data_splitted[i])),
                      '-o', label=s_sizes_names[i], color=commons.color_size(i))
-        if alg == 'PHT':
-            plt.legend()
+        if alg == 'CHT':
+            fig.legend(loc='lower center')
         plt.gca().yaxis.grid(linestyle='dashed')
         plt.xlabel('R size [MB]')
         plt.ylabel('Throughput [M rec/s]')
