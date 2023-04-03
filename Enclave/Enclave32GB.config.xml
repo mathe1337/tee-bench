@@ -4,8 +4,8 @@
   <StackMaxSize>0x20000</StackMaxSize>
   <!--   32 GB-->
       <HeapMaxSize>0x800000000</HeapMaxSize>
-  <TCSNum>9</TCSNum>
-  <TCSMinPool>9</TCSMinPool>
+  <TCSNum>16</TCSNum>
+  <TCSMinPool>16</TCSMinPool>
   <TCSPolicy>1</TCSPolicy>
   <!-- Recommend changing 'DisableDebug' to 1 to make the enclave undebuggable for enclave release -->
   <DisableDebug>0</DisableDebug>
