@@ -132,7 +132,7 @@ if __name__ == '__main__':
         for mode in config['modes']:
             commons.compile_app(mode, enclave_config_file='Enclave/Enclave32GB.config.xml')
             for ds in ['cache-exceed', 'L']:
-                for alg in commons.get_all_algorithms_extended():
+                for alg in commons.get_all_algorithms():
                     run_join(mode, alg, ds, config['threads'], config['reps'])
 
     plot_throughput()
