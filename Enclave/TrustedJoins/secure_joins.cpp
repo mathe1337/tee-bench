@@ -258,7 +258,7 @@ result_t *ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm
 }
 table_t *preload_relR;
 table_t *preload_relS;
-result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS){
+/*result_t *ecall_preload_relations(struct table_t *relR, struct table_t *relS){
     preload_relR->num_tuples = relR->num_tuples;
     preload_relR->ratio_holes = relR->ratio_holes;
     preload_relR->sorted = relR->sorted;
@@ -266,7 +266,7 @@ result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS){
     for(auto idx = 0;idx < preload_relR->num_tuples;++idx){
 
     }
-};
+};*/
 result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
     return ecall_join(relR,relS,algorithm_name,nthreads,cpu_cntr);
 }
@@ -313,8 +313,9 @@ uint32_t ecall_join_sealed_tables(const uint8_t *sealed_r,
     struct table_t *relS = (struct table_t *) unseal_rel(sealed_s, size_s);
     printf("Unseal S successful");
     ocall_stopTimer(&unseal_timer);
+    uint64_t cpu_counter;
     ocall_startTimer(&join_timer);
-    result_t *result = ecall_join(relR, relS, algorithm, nthreads);
+    result_t *result = ecall_join(relR, relS, algorithm, nthreads,&cpu_counter);
     if (strcmp(algorithm, "RHO_seal_buffer") != 0) {
         output = to_relation(result);
     }
@@ -359,14 +360,14 @@ uint32_t ecall_three_way_join_sealed_tables(const uint8_t *sealed_r,
     relation_t *relT = (relation_t *) unseal_rel(sealed_t, size_tt);
     printf("Unseal T successful");
     ocall_stopTimer(&unseal_timer);
-
+    uint64_t cpu_counter;
     ocall_startTimer(&join1_timer);
-    result_t *result1 = ecall_join(relR, relS, "RHO", nthreads);
+    result_t *result1 = ecall_join(relR, relS, "RHO", nthreads, &cpu_counter);
     relation_t *output1 = to_relation(result1);
     ocall_stopTimer(&join1_timer);
 
     ocall_startTimer(&join2_timer);
-    result_t *result2 = ecall_join(relT, output1, "RHO", nthreads);
+    result_t *result2 = ecall_join(relT, output1, "RHO", nthreads,&cpu_counter);
     relation_t *output2 = to_relation(result2);
     ocall_stopTimer(&join2_timer);
 
