@@ -258,15 +258,19 @@ result_t *ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm
 }
 table_t *preload_relR;
 table_t *preload_relS;
-/*result_t *ecall_preload_relations(struct table_t *relR, struct table_t *relS){
+result_t *ecall_preload_relations(struct table_t *relR, struct table_t *relS){
     preload_relR->num_tuples = relR->num_tuples;
     preload_relR->ratio_holes = relR->ratio_holes;
     preload_relR->sorted = relR->sorted;
-    preload_relR->tuples = (tuple_t*)MALLOC(relR->num_tuples * sizeof (tuple_t))
-    for(auto idx = 0;idx < preload_relR->num_tuples;++idx){
+    preload_relR->tuples = (tuple_t*)MALLOC(relR->num_tuples * sizeof (tuple_t));
+    memcpy(preload_relR->tuples,relR->tuples,relR->num_tuples);
 
-    }
-};*/
+    preload_relS->num_tuples = relS->num_tuples;
+    preload_relS->ratio_holes = relS->ratio_holes;
+    preload_relS->sorted = relR->sorted;
+    preload_relS->tuples = (tuple_t*)MALLOC(relS->num_tuples * sizeof (tuple_t));
+    memcpy(preload_relS->tuples,relR->tuples, relS->num_tuples);
+};
 result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
     return ecall_join(relR,relS,algorithm_name,nthreads,cpu_cntr);
 }
