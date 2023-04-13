@@ -165,7 +165,7 @@ Enclave_C_Files := $(ENCLAVE_SOURCES_C) $(INCLUDE_SOURCES_C) $(JOIN_SOURCES_C)
 Enclave_Include_Paths := -IEnclave -IInclude \
 						 -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx \
 						 -IEnclave/TrustedJoins -IJoins -IJoins/stitch -IJoins/cht -IJoins/mway \
-						  -IJoins/oblidb -IJoins/psm -IJoins/mcjoin -IEnclave/TrustedJoins/oblidb
+						  -IJoins/oblidb -IJoins/psm -IJoins/mcjoin -IEnclave/TrustedJoins/oblidb -IApp/Lib
 
 
 Enclave_C_Flags := $(Enclave_Include_Paths) $(CFLAGS) -nostdinc -fvisibility=hidden -fpie -ffunction-sections \

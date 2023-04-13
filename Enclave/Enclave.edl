@@ -72,7 +72,15 @@ enclave {
         public result_t* ecall_join([in] struct table_t * relR,
                                     [in] struct table_t * relS,
                                     [in, size=128] char* algorithm,
-                                    int nthreads);
+                                    int nthreads,[user_check] uint64_t * cpu_cntr);
+
+        public result_t* ecall_join_usercheck([user_check] struct table_t * relR,
+                                    [user_check] struct table_t * relS,
+                                    [in, size=128] char* algorithm,
+                                    int nthreads,[user_check] uint64_t * cpu_cntr);
+        public void ecall_preload_relations([in] struct table_t * relR,[in] struct table_t * relS);
+        public result_t* ecall_join_preload([in, size=128] char* algorithm,
+                                    int nthreads,[user_check] uint64_t * cpu_cntr);
 };
 
     untrusted {
