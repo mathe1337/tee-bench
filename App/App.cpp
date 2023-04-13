@@ -488,12 +488,13 @@ int SGX_CDECL main(int argc, char *argv[])
 //#ifdef PCM_COUNT
 //        ocall_set_system_counter_state("Start ecall join");
 //#endif
+        uint64_t cpu_counter;
         ret = ecall_join(global_eid,
                          &results,
                          &tableR,
                          &tableS,
                          params.algorithm_name,
-                         (int) params.nthreads);
+                         (int) params.nthreads,&cpu_counter);
 //#ifdef PCM_COUNT
 //        ocall_get_system_custom_counter_state("End ecall join");
 //#endif
