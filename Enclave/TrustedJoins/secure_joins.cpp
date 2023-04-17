@@ -20,7 +20,29 @@
 #include "rho_atomic/radix_join_atomic.h"
 #include "rdtscpWrapper.h"
 #include "prj_params.h"
+#include <array>
+#include <stdlib.h>
 
+
+#define MALLOC(SZ) alloc_aligned(SZ+RELATION_PADDING)
+
+void *
+alloc_aligned(size_t size)
+{
+    void * ret;
+    ret = memalign(CACHE_LINE_SIZE, size);
+
+
+//    /** Not an elegant way of passing whether we will numa-localize, but this
+//        feature is experimental anyway. */
+//    if(numalocalize) {
+//        struct row_t * mem = (struct row_t *) ret;
+//        uint32_t ntuples = size / sizeof(struct row_t*);
+//        numa_localize(mem, ntuples, nthreads);
+//    }
+
+    return ret;
+}
 extern char aad_mac_text[256];
 //extern result_t* rhobli_join (struct table_t *relR, struct table_t *relS, int nthreads);
 
@@ -258,7 +280,8 @@ result_t *ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm
 }
 table_t *preload_relR;
 table_t *preload_relS;
-result_t *ecall_preload_relations(struct table_t *relR, struct table_t *relS){
+bool preload = false;
+void ecall_preload_relations(struct table_t *relR,struct table_t *relS){
     preload_relR->num_tuples = relR->num_tuples;
     preload_relR->ratio_holes = relR->ratio_holes;
     preload_relR->sorted = relR->sorted;
@@ -267,15 +290,18 @@ result_t *ecall_preload_relations(struct table_t *relR, struct table_t *relS){
 
     preload_relS->num_tuples = relS->num_tuples;
     preload_relS->ratio_holes = relS->ratio_holes;
-    preload_relS->sorted = relR->sorted;
+    preload_relS->sorted = relS->sorted;
     preload_relS->tuples = (tuple_t*)MALLOC(relS->num_tuples * sizeof (tuple_t));
-    memcpy(preload_relS->tuples,relR->tuples, relS->num_tuples);
+    memcpy(preload_relS->tuples,relS->tuples, relS->num_tuples);
+
+    preload = true;
 };
 result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
     return ecall_join(relR,relS,algorithm_name,nthreads,cpu_cntr);
 }
 result_t *ecall_join_preload(char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
-
+    if(preload)
+        return ecall_join(preload_relR,preload_relS,algorithm_name,nthreads,cpu_cntr);
 }
 relation_t *to_relation(result_t *result) {
 #ifndef JOIN_MATERIALIZE

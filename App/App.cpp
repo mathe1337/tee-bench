@@ -444,6 +444,7 @@ int SGX_CDECL main(int argc, char *argv[])
     logger(INFO, "Running algorithm %s", params.algorithm_name);
 
     clock_gettime(CLOCK_MONOTONIC, &tw1); // POSIX; use timespec_get in C11
+    uint64_t cpu_counter;
     if (params.seal)
     {
         uint64_t total_cycles, retrieve_data_timer;
@@ -488,7 +489,6 @@ int SGX_CDECL main(int argc, char *argv[])
 //#ifdef PCM_COUNT
 //        ocall_set_system_counter_state("Start ecall join");
 //#endif
-        uint64_t cpu_counter;
         ret = ecall_join(global_eid,
                          &results,
                          &tableR,
@@ -504,6 +504,7 @@ int SGX_CDECL main(int argc, char *argv[])
 #endif
     }
     clock_gettime(CLOCK_MONOTONIC, &tw2);
+    double  time_s = (((double) cpu_counter / 2900.0) / 1000000.0);
     time = 1000.0*(double)tw2.tv_sec + 1e-6*(double)tw2.tv_nsec
                         - (1000.0*(double)tw1.tv_sec + 1e-6*(double)tw1.tv_nsec);
     logger(INFO, "Total join runtime: %.2fs", time/1000);
