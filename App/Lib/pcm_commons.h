@@ -4,6 +4,7 @@
 #include "cpucounters.h"
 
 #ifdef PCM_COUNT
+using namespace pcm;
 void ensurePmuNotBusy(PCM *m, bool forcedProgramming);
 #endif
 

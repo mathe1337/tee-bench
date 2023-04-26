@@ -11,6 +11,7 @@
 #ifdef NATIVE_COMPILATION
 #include "native_ocalls.h"
 #include "Logger.h"
+#include "pcm_commons.h"
 #else
 #include <libcxx/cmath>
 #include "Enclave.h"

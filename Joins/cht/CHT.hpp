@@ -12,6 +12,7 @@
 #ifdef NATIVE_COMPILATION
 #include "Logger.h"
 #include "native_ocalls.h"
+#include "pcm_commons.h"
 #else
 #include "Enclave_t.h"
 #include "Enclave.h"

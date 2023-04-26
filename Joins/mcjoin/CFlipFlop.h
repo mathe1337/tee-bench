@@ -8,6 +8,7 @@
 #ifdef NATIVE_COMPILATION
 #include "native_ocalls.h"
 #include "Logger.h"
+#include "pcm_commons.h"
 #else
 #include "Enclave.h"
 #include "Enclave_t.h"

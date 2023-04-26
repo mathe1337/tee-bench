@@ -49,7 +49,6 @@
 #ifndef NATIVE_COMPILATION
 #include "Enclave_u.h"
 #endif
-
 #ifdef PCM_COUNT
 #include "pcm_commons.h"
 #include "cpucounters.h"
@@ -218,6 +217,7 @@ int SGX_CDECL main(int argc, char *argv[])
     uint32_t sealed_data_size_r = 0, sealed_data_size_s = 0;
 
 #ifdef PCM_COUNT
+    using namespace pcm;
     PCM *m = PCM::getInstance();
     if (0) {
         m->program (PCM::DEFAULT_EVENTS, NULL);
@@ -255,6 +255,7 @@ int SGX_CDECL main(int argc, char *argv[])
     params.r_from_path     = 0;
     params.s_from_path     = 0;
     params.three_way_join  = 0;
+    params.mode = preload;
     strcpy(params.algorithm_name, "RHO");
 
     parse_args(argc, argv, &params, NULL);
@@ -444,7 +445,11 @@ int SGX_CDECL main(int argc, char *argv[])
     logger(INFO, "Running algorithm %s", params.algorithm_name);
 
     clock_gettime(CLOCK_MONOTONIC, &tw1); // POSIX; use timespec_get in C11
-    uint64_t cpu_counter;
+    uint64_t cpu_counter = 0;
+    ecall_preload_relations(global_eid,
+                            &tableR,
+                            &tableS);
+
     if (params.seal)
     {
         uint64_t total_cycles, retrieve_data_timer;
@@ -489,12 +494,17 @@ int SGX_CDECL main(int argc, char *argv[])
 //#ifdef PCM_COUNT
 //        ocall_set_system_counter_state("Start ecall join");
 //#endif
-        ret = ecall_join(global_eid,
-                         &results,
-                         &tableR,
-                         &tableS,
-                         params.algorithm_name,
-                         (int) params.nthreads,&cpu_counter);
+if(params.mode == usercheck){
+    ret = ecall_join_usercheck(global_eid,
+                               &results,
+                               &tableR,
+                               &tableS,
+                               params.algorithm_name,
+                               (int) params.nthreads,&cpu_counter);
+}else if(params.mode == preload){
+    ret = ecall_join_preload(global_eid,&results,params.algorithm_name, (int) params.nthreads,&cpu_counter);
+
+}
 //#ifdef PCM_COUNT
 //        ocall_get_system_custom_counter_state("End ecall join");
 //#endif
@@ -508,8 +518,9 @@ int SGX_CDECL main(int argc, char *argv[])
     time = 1000.0*(double)tw2.tv_sec + 1e-6*(double)tw2.tv_nsec
                         - (1000.0*(double)tw1.tv_sec + 1e-6*(double)tw1.tv_nsec);
     logger(INFO, "Total join runtime: %.2fs", time/1000);
+    logger(INFO, "Total join runtime: %.2fs", time_s);
     logger(INFO, "throughput = %.2lf [M rec / s]",
-           (double)(params.r_size + params.s_size)/(1000*time));
+           (double)(params.r_size + params.s_size)/(time_s));
     if (ret != SGX_SUCCESS) {
         ret_error_support(ret);
     }

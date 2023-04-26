@@ -3,8 +3,12 @@
 
 #include "data-types.h"
 
+enum mode {
+    usercheck = 0,
+    preload = 1
+};
 typedef struct args_t {
-    algorithm_t* algorithm;
+    algorithm_t *algorithm;
     char algorithm_name[128];
     char r_path[512];
     char s_path[512];
@@ -22,9 +26,10 @@ typedef struct args_t {
     int r_from_path;
     int s_from_path;
     int three_way_join;
+    enum mode mode;
 } args_t;
 
-void parse_args(int argc, char ** argv, args_t * params, struct algorithm_t algorithms[]);
+void parse_args(int argc, char **argv, args_t *params, struct algorithm_t algorithms[]);
 
 void print_relation(relation_t *rel, uint32_t num, uint32_t offset);
 

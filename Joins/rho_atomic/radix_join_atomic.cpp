@@ -10,6 +10,7 @@
 #include "Logger.h"
 #include "native_ocalls.h"
 #include "malloc.h"
+#include "pcm_commons.h"
 #else
 #include "Enclave.h"
 #include "Enclave_t.h"

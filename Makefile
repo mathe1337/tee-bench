@@ -34,7 +34,7 @@ ifeq (,$(findstring PCM_COUNT, $(CFLAGS)))
     PCM_LINK=
 else
     # it is set
-	PCM_LINK = -Llib/pcm -lpcm -Wl,-rpath=lib/pcm
+	PCM_LINK = -Llib/pcm/lib/ -lpcm -Wl,-rpath=Llib/pcm/lib/
 	PCM_COUNT=1
 endif
 
@@ -121,7 +121,7 @@ endif
 App_Cpp_Files := App/App.cpp $(wildcard App/Lib/*.cpp) $(wildcard Joins/oblidb/*.cpp) $(wildcard Joins/psm/*.cpp) \
 
 App_C_Files := $(wildcard App/Lib/*.c) $(INCLUDE_SOURCES_C)
-App_Include_Paths := -IApp -I$(SGX_SDK)/include -Ilib/pcm -IInclude \
+App_Include_Paths := -IApp -I$(SGX_SDK)/include -Ilib/pcm/src/ -IInclude \
 					 -IApp/Lib -IJoins/oblidb -IJoins/psm
 
 App_C_Flags := -fPIC -fopenmp -Wno-attributes $(App_Include_Paths)
@@ -165,7 +165,7 @@ Enclave_C_Files := $(ENCLAVE_SOURCES_C) $(INCLUDE_SOURCES_C) $(JOIN_SOURCES_C)
 Enclave_Include_Paths := -IEnclave -IInclude \
 						 -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx \
 						 -IEnclave/TrustedJoins -IJoins -IJoins/stitch -IJoins/cht -IJoins/mway \
-						  -IJoins/oblidb -IJoins/psm -IJoins/mcjoin -IEnclave/TrustedJoins/oblidb -IApp/Lib
+						  -IJoins/oblidb -IJoins/psm -IJoins/mcjoin -IEnclave/TrustedJoins/oblidb -Ilib/pcm/src/ -IApp/Lib
 
 
 Enclave_C_Flags := $(Enclave_Include_Paths) $(CFLAGS) -nostdinc -fvisibility=hidden -fpie -ffunction-sections \
@@ -275,7 +275,7 @@ endif
 
 native:
 	@$(CXX) -std=c++11 -fPIC -Wno-attributes $(CFLAGS) -I$(SGX_SDK)/include -IInclude -IApp/Lib -IJoins -IJoins/cht \
- 		-IJoins/oblidb -Ilib/pcm -IJoins/psm -IJoins/mcjoin -IJoins/mway \
+ 		-IJoins/oblidb -Ilib/pcm/src/ -IJoins/psm -IJoins/mcjoin -IJoins/mway \
 		$(wildcard App/Lib/*.cpp) $(wildcard App/Lib/*.c) $(INCLUDE_SOURCES_CPP) $(INCLUDE_SOURCES_C) \
 		native.cpp $(JOIN_SOURCES_C) $(JOIN_SOURCES_CPP) \
 		-O3 -o app -lssl -lcrypto -lpthread -ldl $(PCM_LINK) -DNATIVE_COMPILATION

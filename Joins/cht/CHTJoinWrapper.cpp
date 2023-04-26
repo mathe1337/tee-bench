@@ -5,6 +5,7 @@
 #ifdef NATIVE_COMPILATION
 #include <malloc.h>
 #include "native_ocalls.h"
+#include "pcm_commons.h"
 #endif
 
 

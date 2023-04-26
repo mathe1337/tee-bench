@@ -33,7 +33,7 @@ void parse_args(int argc, char ** argv, args_t * params, struct algorithm_t algo
 
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "a:c:d:e:l:n:r:s:t:u:x:y:z:hv",
+        c = getopt_long(argc, argv, "a:c:d:e:l:n:m:r:s:t:u:x:y:z:hv",
                    long_options, &option_index);
 
         if (c == -1) {
@@ -117,7 +117,9 @@ void parse_args(int argc, char ** argv, args_t * params, struct algorithm_t algo
                     exit(EXIT_FAILURE);
                 }
                 break;
-
+            case 'm':
+                params->mode = (strcmp("usercheck",optarg) == 0 ? usercheck : preload);
+                break;
             case 'n':
                 params->nthreads = atoi(optarg);
                 break;

@@ -12,7 +12,7 @@
 #ifdef SGX_COUNTERS
 #include "sgx_counters.h"
 #endif
-
+using namespace pcm;
 static bool init = false;
 
 #ifdef PCM_COUNT

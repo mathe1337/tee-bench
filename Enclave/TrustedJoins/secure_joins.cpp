@@ -27,9 +27,8 @@
 #define MALLOC(SZ) alloc_aligned(SZ+RELATION_PADDING)
 
 void *
-alloc_aligned(size_t size)
-{
-    void * ret;
+alloc_aligned(size_t size) {
+    void *ret;
     ret = memalign(CACHE_LINE_SIZE, size);
 
 
@@ -43,6 +42,7 @@ alloc_aligned(size_t size)
 
     return ret;
 }
+
 extern char aad_mac_text[256];
 //extern result_t* rhobli_join (struct table_t *relR, struct table_t *relS, int nthreads);
 
@@ -244,7 +244,8 @@ sgx_status_t ecall_get_sealed_data(uint8_t *sealed_blob, uint32_t data_size) {
     return SGX_SUCCESS;
 }
 
-result_t *ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
+result_t *
+ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads, uint64_t *cpu_cntr) {
     int i = 0, found = 0;
     algorithm_t *algorithm = nullptr;
     while (sgx_algorithms[i].join) {
@@ -274,35 +275,49 @@ result_t *ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm
         rdtscpWrapper rdtscpWrapper(cpu_cntr);
         res = algorithm->join(relR, relS, nthreads);
     }
+    logger(INFO, "cpu_cntr:%lu", *cpu_cntr);
     ocall_getrusage(&usage, 1);
 
     return res;
 }
-table_t *preload_relR;
-table_t *preload_relS;
-bool preload = false;
-void ecall_preload_relations(struct table_t *relR,struct table_t *relS){
-    preload_relR->num_tuples = relR->num_tuples;
-    preload_relR->ratio_holes = relR->ratio_holes;
-    preload_relR->sorted = relR->sorted;
-    preload_relR->tuples = (tuple_t*)MALLOC(relR->num_tuples * sizeof (tuple_t));
-    memcpy(preload_relR->tuples,relR->tuples,relR->num_tuples);
 
-    preload_relS->num_tuples = relS->num_tuples;
-    preload_relS->ratio_holes = relS->ratio_holes;
-    preload_relS->sorted = relS->sorted;
-    preload_relS->tuples = (tuple_t*)MALLOC(relS->num_tuples * sizeof (tuple_t));
-    memcpy(preload_relS->tuples,relS->tuples, relS->num_tuples);
+table_t preload_relR;
+table_t preload_relS;
+bool preload = false;
+
+void ecall_preload_relations(struct table_t *relR, struct table_t *relS) {
+    preload_relR.num_tuples = relR->num_tuples;
+    preload_relR.ratio_holes = relR->ratio_holes;
+    preload_relR.sorted = relR->sorted;
+    //preload_relS.tuples = new tuple_t;
+    preload_relR.tuples = (tuple_t *) MALLOC(relR->num_tuples * sizeof(tuple_t));
+    memcpy(preload_relR.tuples, relR->tuples, relR->num_tuples * sizeof(tuple_t));
+    preload_relS.num_tuples = relS->num_tuples;
+    preload_relS.ratio_holes = relS->ratio_holes;
+    preload_relS.sorted = relS->sorted;
+    //preload_relS.tuples = new tuple_t;
+    preload_relS.tuples = (tuple_t *) MALLOC(relS->num_tuples * sizeof(tuple_t));
+    memcpy(preload_relS.tuples, relS->tuples, relS->num_tuples * sizeof(tuple_t));
 
     preload = true;
 };
-result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
-    return ecall_join(relR,relS,algorithm_name,nthreads,cpu_cntr);
+
+result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,
+                               uint64_t *cpu_cntr) {
+    return ecall_join(relR, relS, algorithm_name, nthreads, cpu_cntr);
 }
-result_t *ecall_join_preload(char *algorithm_name, int nthreads,uint64_t * cpu_cntr) {
-    if(preload)
-        return ecall_join(preload_relR,preload_relS,algorithm_name,nthreads,cpu_cntr);
+
+result_t *ecall_join_preload(char *algorithm_name, int nthreads, uint64_t *cpu_cntr) {
+    logger(INFO, " num-tuples r: %lu", preload_relR.num_tuples);
+    logger(INFO, " num-tuples s: %lu", preload_relS.num_tuples);
+    if (preload)
+        return ecall_join(&preload_relR, &preload_relS, algorithm_name, nthreads, cpu_cntr);
 }
+
+void copy_relation(relation_t* src, relation_t* dest){
+
+}
+
 relation_t *to_relation(result_t *result) {
 #ifndef JOIN_MATERIALIZE
     logger(WARN, "JOIN_MATERIALIZE not defined. to_relation might fail.");
@@ -345,7 +360,7 @@ uint32_t ecall_join_sealed_tables(const uint8_t *sealed_r,
     ocall_stopTimer(&unseal_timer);
     uint64_t cpu_counter;
     ocall_startTimer(&join_timer);
-    result_t *result = ecall_join(relR, relS, algorithm, nthreads,&cpu_counter);
+    result_t *result = ecall_join(relR, relS, algorithm, nthreads, &cpu_counter);
     if (strcmp(algorithm, "RHO_seal_buffer") != 0) {
         output = to_relation(result);
     }
@@ -397,7 +412,7 @@ uint32_t ecall_three_way_join_sealed_tables(const uint8_t *sealed_r,
     ocall_stopTimer(&join1_timer);
 
     ocall_startTimer(&join2_timer);
-    result_t *result2 = ecall_join(relT, output1, "RHO", nthreads,&cpu_counter);
+    result_t *result2 = ecall_join(relT, output1, "RHO", nthreads, &cpu_counter);
     relation_t *output2 = to_relation(result2);
     ocall_stopTimer(&join2_timer);
 
