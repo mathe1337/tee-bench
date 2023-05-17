@@ -4,7 +4,7 @@ cmake-build-debug/
 *.so
 **/*.o
 .config_HW_DEBUG_x64
-app
+
 r00*/
 Enclave/ThreadLib/
 scripts/.ipynb_checkpoints/

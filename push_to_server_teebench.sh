@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 push_to_server() {
-  cp ../.gitignore tmp_rsync_ignore
+  cp .gitignore tmp_rsync_ignore
   echo "" >> tmp_rsync_ignore
   echo ".git" >> tmp_rsync_ignore
   echo "graphs" >> tmp_rsync_ignore
@@ -11,7 +11,7 @@ push_to_server() {
   for HOSTNAME in "$@"; do
     # push code
     echo "Pushing code to $HOSTNAME"
-    rsync -rzvh --filter=':- tmp_rsync_ignore'  --progress . $HOSTNAME:~/thesis-encryptedDB
+    rsync -rzvh --filter=':- tmp_rsync_ignore'  --progress . $HOSTNAME:~/tee-bench
   done;
   rm tmp_rsync_ignore
 }

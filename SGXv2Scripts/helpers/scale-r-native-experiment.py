@@ -238,21 +238,21 @@ if __name__ == '__main__':
                 config['reps'] = int(arg)
 
     mode = "native"
-    max_r_size_mb = 5000
+    max_r_size_mb = 500
     s_sizes = [1 * mb_of_data,  # 1MB
                20 * mb_of_data,  # 20 MB
-               28 * mb_of_data,  # 28 MB
-               512 * mb_of_data]  # 512 MB
+               28 * mb_of_data]  # 28 MB
+               #512 * mb_of_data]  # 512 MB
 
     if config['experiment']:
-        commons.compile_app(mode, enclave_config_file='Enclave/Enclave32GB.config.xml')  # , flags=["SGX_COUNTERS"])
+        commons.compile_app(mode, enclave_config_file='Enclave/Enclave8GB.config.xml')  # , flags=["SGX_COUNTERS"])
         commons.remove_file(filename)
         commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
         for s_size in s_sizes:
             for alg in commons.get_all_algorithms():
-                for i in range(1000, max_r_size_mb + 1, 1000):
-                    run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode)
+                for i in [2**x for x in range(0,10,2)]:#range(50, max_r_size_mb + 1, 50):
+                    run_join(commons.PROG, alg, i*mb_of_data, s_size, config['threads'], config['reps'], mode)
 
     plot()
     # plot_with_ewb()

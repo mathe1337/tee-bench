@@ -11,17 +11,18 @@ import subprocess
 import csv
 import matplotlib.pyplot as plt
 
-filename = "../data/scale-r-sgx-output.csv"
+filename1 = "../data/scale-r-sgx-output.csv"
+filename2 = "../data/scale-r-sgx-output.csv"
 mb_of_data = 131072
 
 
-def run_join(prog, alg, size_r, size_s, threads, reps, mode):
-    f = open(filename, "a")
+def run_join(prog, alg, size_r, size_s, threads, reps, mode, location):
+    f = open("../data/scale-r-sgx-" + location + "-output.csv", "a")
     results = []
     ewbs = []
     for i in range(0, reps):
         stdout = subprocess.check_output(prog + " -a " + alg + " -r " + str(size_r) + " -s " + str(size_s) +
-                                         " -n " + str(threads), cwd="../../", shell=True) \
+                                         " -n " + str(threads)+" -m "+ location, cwd="../../", shell=True) \
             .decode('utf-8')
         for line in stdout.splitlines():
             if "Throughput" in line:
@@ -45,14 +46,14 @@ def run_join(prog, alg, size_r, size_s, threads, reps, mode):
     f.close()
 
 
-def plot():
+def plot(dataname,location):
     s_sizes_names = [
         '$S_{size}$ < L2',
         'L2 < $S_{size}$ < L3',
         'L3 < $S_{size}$',
         'L3 << $S_{size}$'
     ]
-    csvf = open(filename, mode='r')
+    csvf = open(dataname, mode='r')
     csvr = csv.DictReader(csvf)
     all_data = list(csvr)
     r_sizes = sorted(set(map(lambda x: float(x['sizeR']), all_data)))
@@ -85,7 +86,7 @@ def plot():
     for alg in algos:
         data = list(filter(lambda x: x['alg'] == alg, all_data))
         data_splitted = [[y for y in data if y['sizeS'] == str(x)] for x in s_sizes]
-        plt.subplot(3, 3, algos.index(alg) +1)
+        plt.subplot(3, 3, algos.index(alg) + 1)
         for i in range(0, len(s_sizes)):
             x_sizes = list(filter(lambda x: x['alg'] == alg, all_data))
             x_sizes = sorted(set(map(lambda x: float(x['sizeR']), x_sizes)))
@@ -97,8 +98,9 @@ def plot():
         plt.xlabel('R size [MB]')
         plt.ylabel('Throughput [M rec/s]')
         plt.title(alg)
-        #plt.ylim([0, 70])
-    commons.savefig('../img/scale-r-sgx-algos.png')
+        # plt.ylim([0, 70])
+    commons.savefig('../img/scale-r-sgx-algos-'+location+'.png')
+
 
 # print only CHT
 # fig = plt.figure(figsize=(4, 3))
@@ -143,7 +145,7 @@ def plot():
 # commons.savefig('img/scale-r-PHT.png')
 
 
-def plot_with_ewb():
+def plot_with_ewb(filename):
     csvf = open(filename, mode='r')
     csvr = csv.DictReader(csvf)
     all_data = list(csvr)
@@ -238,22 +240,23 @@ if __name__ == '__main__':
                 config['reps'] = int(arg)
 
     mode = "sgx"
-    max_r_size_mb = 5000
+    max_r_size_mb = 500
     s_sizes = [1 * mb_of_data,  # 1MB
                20 * mb_of_data,  # 20 MB
-               28 * mb_of_data,  # 28 MB
-               512 * mb_of_data]  # 512 MB
+               28 * mb_of_data]  # 28 MB
+               #512 * mb_of_data]  # 512 MB
+    for l in ['preload']:
+        filename = "../data/scale-r-sgx-" + l + "-output.csv"
+        if config['experiment']:
+            commons.compile_app(mode, enclave_config_file='Enclave/Enclave8GB.config.xml')  # , flags=["SGX_COUNTERS"])
+            commons.remove_file(filename)
+            commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
-    if config['experiment']:
-        commons.compile_app(mode, enclave_config_file='Enclave/Enclave32GB.config.xml')  # , flags=["SGX_COUNTERS"])
-        commons.remove_file(filename)
-        commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
+            for s_size in s_sizes:
+                for alg in commons.get_all_algorithms():
+                    for i in [2**x for x in range(0,10,2)]:#range(50, max_r_size_mb + 1, 50):
+                        run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode, l)
 
-        for s_size in s_sizes:
-            for alg in commons.get_all_algorithms():
-                for i in range(1000, max_r_size_mb + 1, 1000):
-                    run_join(commons.PROG, alg, i * mb_of_data, s_size, config['threads'], config['reps'], mode)
-
-    plot()
-    # plot_with_ewb()
-    commons.stop_timer(timer)
+        plot(filename,l)
+        # plot_with_ewb()
+        commons.stop_timer(timer)

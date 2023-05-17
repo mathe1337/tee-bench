@@ -7,7 +7,7 @@
 #include "commons.h"
 #include "generator.h"
 #include "Logger.h"
-
+#include "App/PerfEvent.hpp"
 #include "no_partitioning_join.h"
 #include "nested_loop_join.h"
 #include "radix_join.h"
@@ -75,6 +75,25 @@ int main(int argc, char *argv[]) {
     parse_args(argc, argv, &params, algorithms);
 
     logger(DBG, "Number of threads = %d (N/A for every algorithm)", params.nthreads);
+#ifdef PCM_COUNT
+    using namespace pcm;
+    PCM *m = PCM::getInstance();
+    if (0) {
+        m->program (PCM::DEFAULT_EVENTS, NULL);
+    } else {
+        PCM::CustomCoreEventDescription events[2];
+        // MEM_INST_RETIRED.STLB_MISS_LOADS
+        events[0].event_number = 0xD0;
+        events[0].umask_value = 0x11;
+        // MEM_INST_RETIRED.STLB_MISS_STORES
+        events[1].event_number = 0xD0;
+        events[1].umask_value = 0x12;
+        m->program(PCM::CUSTOM_CORE_EVENTS, events);
+    }
+
+    ensurePmuNotBusy(m, true);
+    logger(PCMLOG, "PCM Initialized");
+#endif
 
     seed_generator(params.r_seed);
     if (params.r_from_path)
@@ -120,11 +139,14 @@ int main(int argc, char *argv[]) {
     logger(DBG, "DONE");
 
     logger(INFO, "Running algorithm %s", params.algorithm->name);
-
+    PerfEvent e;
+    e.startCounters();
     clock_t start = clock();
     result_t* matches = params.algorithm->join(&tableR, &tableS, params.nthreads);
     logger(INFO, "Total join runtime: %.2fs", (clock() - start)/ (float)(CLOCKS_PER_SEC));
     logger(INFO, "Matches = %lu", matches->totalresults);
+    e.stopCounters();
+    e.printReport(std::cout,(tableR.num_tuples+tableS.num_tuples));
     delete_relation(&tableR);
     delete_relation(&tableS);
 }

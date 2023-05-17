@@ -45,7 +45,7 @@
 #include "Lib/generator.h"
 #include "commons.h"
 #include "parallel_sort.h"
-
+#include "PerfEvent.hpp"
 #ifndef NATIVE_COMPILATION
 #include "Enclave_u.h"
 #endif
@@ -74,7 +74,7 @@ int initialize_enclave(void)
     
     /* Call sgx_create_enclave to initialize an enclave instance */
     /* Debug Support: set 2nd parameter to 1 */
-    ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave(ENCLAVE_FILENAME, 1, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         ret_error_support(ret);
         return -1;
@@ -494,6 +494,8 @@ int SGX_CDECL main(int argc, char *argv[])
 //#ifdef PCM_COUNT
 //        ocall_set_system_counter_state("Start ecall join");
 //#endif
+PerfEvent e;
+e.startCounters();
 if(params.mode == usercheck){
     ret = ecall_join_usercheck(global_eid,
                                &results,
@@ -505,6 +507,8 @@ if(params.mode == usercheck){
     ret = ecall_join_preload(global_eid,&results,params.algorithm_name, (int) params.nthreads,&cpu_counter);
 
 }
+e.stopCounters();
+e.printReport(std::cout,(tableR.num_tuples+tableS.num_tuples));
 //#ifdef PCM_COUNT
 //        ocall_get_system_custom_counter_state("End ecall join");
 //#endif

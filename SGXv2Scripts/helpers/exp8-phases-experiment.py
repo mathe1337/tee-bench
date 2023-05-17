@@ -230,7 +230,7 @@ if __name__ == '__main__':
         commons.init_file(fname_phases, "mode,alg,ds,phase,cycles\n")
 
         for mode in ['sgx']:
-            commons.compile_app(mode, enclave_config_file='Enclave/Enclave2GB.config.xml', debug=True)
+            commons.compile_app(mode, enclave_config_file='Enclave/Enclave2GB.config.xml', debug=False)
             for ds in commons.get_test_dataset_names():
                 for alg in commons.get_all_algorithms_extended():
                     run_join(mode, alg, ds, config['threads'], config['reps'])

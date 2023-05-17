@@ -16,6 +16,7 @@
 #include "Enclave.h"
 #include "Enclave_t.h"
 #include <sgx_tseal.h>
+#include "rdtscpWrapper.h"
 #endif
 
 #define HASH_BIT_MODULO(K, MASK, NBITS) (((K) & MASK) >> NBITS)
