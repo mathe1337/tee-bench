@@ -47,12 +47,12 @@
 
 /** L1 cache size */
 #ifndef L1_CACHE_SIZE
-#define L1_CACHE_SIZE 32768
+#define L1_CACHE_SIZE 1572864
 #endif
 
 /** L1 associativity */
 #ifndef L1_ASSOCIATIVITY
-#define L1_ASSOCIATIVITY 8
+#define L1_ASSOCIATIVITY 12
 #endif
 
 /** number of tuples fitting into L1 */
@@ -94,7 +94,7 @@
 /** \endinternal */
 
 #ifndef CORES
-#define CORES 8
+#define CORES 16
 #endif
 
 #ifndef SEAL_BUF_RECORDS

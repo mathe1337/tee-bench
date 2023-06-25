@@ -1,5 +1,5 @@
-reps : 1
-threads: 1
+reps : 5
+threads: 16
 modes:
   - native
   - sgx

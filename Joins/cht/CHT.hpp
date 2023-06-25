@@ -21,7 +21,7 @@
 #define PROBE_BATCH_SIZE 16
 
 #ifndef CORES
-#define CORES 8
+#define CORES 16
 #endif
 
 class CHT {

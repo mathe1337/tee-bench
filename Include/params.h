@@ -30,12 +30,12 @@
 
 /** L2 Cache size of the system in bytes */
 #ifndef L2_CACHE_SIZE
-#define L2_CACHE_SIZE (256*1024)
+#define L2_CACHE_SIZE (1.2*1024*1024)
 #endif
 
 /** L3 Cache size of the system in bytes */
 #ifndef L3_CACHE_SIZE
-#define L3_CACHE_SIZE (8*1024*1024)
+#define L3_CACHE_SIZE (24*1024*1024)
 #endif
 
 /**
@@ -74,7 +74,7 @@
 #define ALIGN_NUMTUPLES(N) (((N)+TUPLESPERCACHELINE-1) & ~(TUPLESPERCACHELINE-1))
 
 #ifndef CORES
-#define CORES 8
+#define CORES 16
 #endif
 
 #endif /* PARAMS_H_ */

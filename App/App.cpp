@@ -46,8 +46,11 @@
 #include "commons.h"
 #include "parallel_sort.h"
 #include "PerfEvent.hpp"
+
 #ifndef NATIVE_COMPILATION
+
 #include "Enclave_u.h"
+
 #endif
 #ifdef PCM_COUNT
 #include "pcm_commons.h"
@@ -64,14 +67,15 @@ extern void ocall_set_sgx_counters(const char *message);
 sgx_enclave_id_t global_eid = 0;
 
 struct timespec ts_start;
+PerfEvent e;
+char algorithm_name[128];
 
 /* Initialize the enclave:
  *   Call sgx_create_enclave to initialize an enclave instance
  */
-int initialize_enclave(void)
-{
+int initialize_enclave(void) {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    
+
     /* Call sgx_create_enclave to initialize an enclave instance */
     /* Debug Support: set 2nd parameter to 1 */
     ret = sgx_create_enclave(ENCLAVE_FILENAME, 1, NULL, NULL, &global_eid, NULL);
@@ -87,30 +91,32 @@ int initialize_enclave(void)
 }
 
 /* OCall functions */
-static inline u_int64_t rdtsc(void)
-{
+static inline u_int64_t rdtsc(void) {
     u_int32_t hi, lo;
 
     __asm__ __volatile__("rdtsc"
-    : "=a"(lo), "=d"(hi));
+            : "=a"(lo), "=d"(hi));
 
     return (u_int64_t(hi) << 32) | u_int64_t(lo);
 }
 
-void ocall_startTimer(u_int64_t* t) {
+void ocall_startTimer(u_int64_t *t) {
+    if(strcmp(algorithm_name,"INL") == 0)
+        e.startCounters();
     *t = rdtsc();
 }
 
-void ocall_stopTimer(u_int64_t* t) {
+void ocall_stopTimer(u_int64_t *t) {
     *t = rdtsc() - *t;
+    if(strcmp(algorithm_name,"INL") == 0)
+        e.stopCounters();
 }
 
 void ocall_exit(int exit_status) {
     exit(exit_status);
 }
 
-void ocall_print_string(const char *str)
-{
+void ocall_print_string(const char *str) {
     /* Proxy/Bridge will check the length and null-terminate 
      * the input string to prevent buffer overflow. 
      */
@@ -121,25 +127,22 @@ void ocall_print_string(const char *str)
 uint64_t ocall_get_system_micros() {
     struct timeval tv{};
     gettimeofday(&tv, nullptr);
-    return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
+    return tv.tv_sec * (uint64_t) 1000000 + tv.tv_usec;
 }
 
-void ocall_throw(const char* message)
-{
+void ocall_throw(const char *message) {
     logger(ERROR, "%s", message);
     exit(EXIT_FAILURE);
 }
 
-uint64_t ocall_get_total_ewb()
-{
+uint64_t ocall_get_total_ewb() {
 #ifdef SGX_COUNTERS
     return get_total_ewb();
 #endif
     return 0.0;
 }
 
-void ocall_getrusage(rusage_reduced_t* usage_red, int print)
-{
+void ocall_getrusage(rusage_reduced_t *usage_red, int print) {
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
     usage_red->ru_utime_sec = usage.ru_utime.tv_sec - usage_red->ru_utime_sec;
@@ -150,8 +153,7 @@ void ocall_getrusage(rusage_reduced_t* usage_red, int print)
     usage_red->ru_majflt = usage.ru_majflt - usage_red->ru_majflt;
     usage_red->ru_nvcsw = usage.ru_nvcsw - usage_red->ru_nvcsw;
     usage_red->ru_nivcsw = usage.ru_nivcsw - usage_red->ru_nivcsw;
-    if (print)
-    {
+    if (print) {
         logger(DBG, "************************** RUSAGE **************************");
         logger(DBG, "user CPU time used               : %ld.%lds", usage_red->ru_utime_sec, usage_red->ru_utime_usec);
         logger(DBG, "system CPU time used             : %ld.%lds", usage_red->ru_stime_sec, usage_red->ru_stime_usec);
@@ -163,37 +165,29 @@ void ocall_getrusage(rusage_reduced_t* usage_red, int print)
     }
 }
 
-uint8_t* seal_relation(struct table_t * rel, uint32_t* size)
-{
+uint8_t *seal_relation(struct table_t *rel, uint32_t *size) {
     sgx_status_t ret = ecall_get_sealed_data_size(global_eid, size, rel);
-    if (ret != SGX_SUCCESS )
-    {
+    if (ret != SGX_SUCCESS) {
         ret_error_support(ret);
         return nullptr;
-    }
-    else if (*size == UINT32_MAX)
-    {
+    } else if (*size == UINT32_MAX) {
         logger(ERROR, "get_sealed_data_size failed");
         return nullptr;
     }
 
     logger(DBG, "Allocate for sealed relation %.2lf MB", B_TO_MB(*size));
-    uint8_t* sealed_rel_tmp = (uint8_t *) malloc(*size);
-    if (sealed_rel_tmp == nullptr)
-    {
+    uint8_t *sealed_rel_tmp = (uint8_t *) malloc(*size);
+    if (sealed_rel_tmp == nullptr) {
         logger(ERROR, "Out of memory");
         return nullptr;
     }
     sgx_status_t retval;
     ret = ecall_seal_data(global_eid, &retval, rel, sealed_rel_tmp, *size);
-    if (ret != SGX_SUCCESS)
-    {
+    if (ret != SGX_SUCCESS) {
         ret_error_support(ret);
         free(sealed_rel_tmp);
         return nullptr;
-    }
-    else if (retval != SGX_SUCCESS)
-    {
+    } else if (retval != SGX_SUCCESS) {
         ret_error_support(retval);
         free(sealed_rel_tmp);
         return nullptr;
@@ -203,17 +197,16 @@ uint8_t* seal_relation(struct table_t * rel, uint32_t* size)
 }
 
 /* Application entry */
-int SGX_CDECL main(int argc, char *argv[])
-{
+int SGX_CDECL main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
     struct table_t tableR;
     struct table_t tableS;
-    result_t* results;
-    uint8_t * sealed_result;
+    result_t *results;
+    uint8_t *sealed_result;
     sgx_status_t ret;
     struct timespec tw1, tw2;
     double time;
-    uint8_t  *sealed_R = nullptr, *sealed_S = nullptr;
+    uint8_t *sealed_R = nullptr, *sealed_S = nullptr;
     uint32_t sealed_data_size_r = 0, sealed_data_size_s = 0;
 
 #ifdef PCM_COUNT
@@ -241,20 +234,20 @@ int SGX_CDECL main(int argc, char *argv[])
 
     /* Set default values for cmd line params */
 //    params.algorithm    = &algorithms[0]; /* NPO_st */
-    params.r_size          = 2097152; /* 2*2^20 */
-    params.s_size          = 2097152; /* 2*2^20 */
-    params.r_seed          = 11111;
-    params.s_seed          = 22222;
-    params.nthreads        = 2;
-    params.selectivity     = 100;
-    params.skew            = 0;
+    params.r_size = 2097152; /* 2*2^20 */
+    params.s_size = 2097152; /* 2*2^20 */
+    params.r_seed = 11111;
+    params.s_seed = 22222;
+    params.nthreads = 2;
+    params.selectivity = 100;
+    params.skew = 0;
     params.seal_chunk_size = 0;
-    params.seal            = 0;
-    params.sort_r          = 0;
-    params.sort_s          = 0;
-    params.r_from_path     = 0;
-    params.s_from_path     = 0;
-    params.three_way_join  = 0;
+    params.seal = 0;
+    params.sort_r = 0;
+    params.sort_s = 0;
+    params.r_from_path = 0;
+    params.s_from_path = 0;
+    params.three_way_join = 0;
     params.mode = preload;
     strcpy(params.algorithm_name, "RHO");
 
@@ -288,8 +281,7 @@ int SGX_CDECL main(int argc, char *argv[])
             logger(DBG, "DONE");
             create_relation_fk_sel(&tableT, params.s_size, maxid, params.sort_s);
             logger(DBG, "DONE");
-        }
-        else {
+        } else {
             create_relation_fk(&tableS, params.r_size, params.r_size, params.sort_s);
             logger(DBG, "DONE");
             create_relation_fk(&tableT, params.s_size, params.r_size, params.sort_s);
@@ -298,8 +290,7 @@ int SGX_CDECL main(int argc, char *argv[])
 
         initialize_enclave();
         sealed_R = seal_relation(&tableR, &sealed_data_size_r);
-        if (sealed_R == nullptr)
-        {
+        if (sealed_R == nullptr) {
             sgx_destroy_enclave(global_eid);
             delete_relation(&tableR);
             delete_relation(&tableS);
@@ -307,8 +298,7 @@ int SGX_CDECL main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
         sealed_S = seal_relation(&tableS, &sealed_data_size_s);
-        if (sealed_S == nullptr)
-        {
+        if (sealed_S == nullptr) {
             sgx_destroy_enclave(global_eid);
             delete_relation(&tableR);
             delete_relation(&tableS);
@@ -316,8 +306,7 @@ int SGX_CDECL main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
         sealed_T = seal_relation(&tableT, &sealed_data_size_t);
-        if (sealed_T == nullptr)
-        {
+        if (sealed_T == nullptr) {
             sgx_destroy_enclave(global_eid);
             delete_relation(&tableR);
             delete_relation(&tableS);
@@ -325,7 +314,7 @@ int SGX_CDECL main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
         logger(INFO, "Running algorithm %s", params.algorithm_name);
-        uint32_t  sealed_data_size = 0;
+        uint32_t sealed_data_size = 0;
 
         ret = ecall_three_way_join_sealed_tables(global_eid,
                                                  &sealed_data_size,
@@ -338,21 +327,18 @@ int SGX_CDECL main(int argc, char *argv[])
                                                  params.algorithm_name,
                                                  params.nthreads,
                                                  params.seal_chunk_size);
-        if (ret != SGX_SUCCESS)
-        {
+        if (ret != SGX_SUCCESS) {
             ret_error_support(ret);
         }
         logger(DBG, "Sealed data size = %.2lf MB", B_TO_MB(sealed_data_size));
-        sealed_result = (uint8_t*)malloc(sealed_data_size);
-        if (sealed_result == nullptr)
-        {
+        sealed_result = (uint8_t *) malloc(sealed_data_size);
+        if (sealed_result == nullptr) {
             logger(ERROR, "Out of memory");
             exit(EXIT_FAILURE);
         }
         sgx_status_t retval;
         ret = ecall_get_sealed_data(global_eid, &retval, sealed_result, sealed_data_size);
-        if (ret != SGX_SUCCESS)
-        {
+        if (ret != SGX_SUCCESS) {
             ret_error_support(ret);
         }
         sgx_destroy_enclave(global_eid);
@@ -367,14 +353,11 @@ int SGX_CDECL main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
     }
 
-    if (params.r_from_path)
-    {
+    if (params.r_from_path) {
         logger(INFO, "Build relation R from file %s", params.r_path);
         create_relation_from_file(&tableR, params.r_path, params.sort_r);
         params.r_size = tableR.num_tuples;
-    }
-    else
-    {
+    } else {
         logger(INFO, "Build relation R with size = %.2lf MB (%u tuples)",
                B_TO_MB(sizeof(struct row_t) * params.r_size),
                params.r_size);
@@ -391,29 +374,22 @@ int SGX_CDECL main(int argc, char *argv[])
     logger(DBG, "DONE");
 
     seed_generator(params.s_seed);
-    if (params.s_from_path)
-    {
+    if (params.s_from_path) {
         logger(INFO, "Build relation S from file %s", params.s_path);
         create_relation_from_file(&tableS, params.s_path, params.sort_s);
         params.s_size = tableS.num_tuples;
-    }
-    else
-    {
+    } else {
         logger(INFO, "Build relation S with size = %.2lf MB (%u tuples)",
                B_TO_MB(sizeof(struct row_t) * params.s_size),
                params.s_size);
-        if (params.skew > 0)
-        {
+        if (params.skew > 0) {
             logger(INFO, "Skew relation: %.2lf", params.skew);
             create_relation_zipf(&tableS, params.s_size, params.r_size, params.skew, params.sort_s);
-        }
-        else if (params.selectivity != 100)
-        {
+        } else if (params.selectivity != 100) {
             logger(INFO, "Table S selectivity = %d", params.selectivity);
             uint32_t maxid = params.selectivity != 0 ? (100 * params.r_size / params.selectivity) : 0;
             create_relation_fk_sel(&tableS, params.s_size, maxid, params.sort_s);
-        }
-        else {
+        } else {
             create_relation_fk(&tableS, params.s_size, params.r_size, params.sort_s);
         }
     }
@@ -422,19 +398,16 @@ int SGX_CDECL main(int argc, char *argv[])
 
     initialize_enclave();
 
-    if (params.seal)
-    {
+    if (params.seal) {
         sealed_R = seal_relation(&tableR, &sealed_data_size_r);
-        if (sealed_R == nullptr)
-        {
+        if (sealed_R == nullptr) {
             sgx_destroy_enclave(global_eid);
             delete_relation(&tableR);
             delete_relation(&tableS);
             exit(EXIT_FAILURE);
         }
         sealed_S = seal_relation(&tableS, &sealed_data_size_s);
-        if (sealed_S == nullptr)
-        {
+        if (sealed_S == nullptr) {
             sgx_destroy_enclave(global_eid);
             delete_relation(&tableR);
             delete_relation(&tableS);
@@ -449,9 +422,9 @@ int SGX_CDECL main(int argc, char *argv[])
     ecall_preload_relations(global_eid,
                             &tableR,
                             &tableS);
-
-    if (params.seal)
-    {
+    uint64_t mutex_cpu_cntr = 0;
+    strcpy(algorithm_name, params.algorithm_name);
+    if (params.seal) {
         uint64_t total_cycles, retrieve_data_timer;
         uint32_t sealed_data_size = 0;
         ocall_startTimer(&total_cycles);
@@ -464,14 +437,12 @@ int SGX_CDECL main(int argc, char *argv[])
                                        params.algorithm_name,
                                        params.nthreads,
                                        params.seal_chunk_size);
-        if (ret != SGX_SUCCESS)
-        {
+        if (ret != SGX_SUCCESS) {
             ret_error_support(ret);
         }
         logger(DBG, "Sealed data size = %.2lf MB", B_TO_MB(sealed_data_size));
-        sealed_result = (uint8_t*)malloc(sealed_data_size);
-        if (sealed_result == nullptr)
-        {
+        sealed_result = (uint8_t *) malloc(sealed_data_size);
+        if (sealed_result == nullptr) {
             logger(ERROR, "Out of memory");
             exit(EXIT_FAILURE);
         }
@@ -479,36 +450,29 @@ int SGX_CDECL main(int argc, char *argv[])
         ocall_startTimer(&retrieve_data_timer);
         ret = ecall_get_sealed_data(global_eid, &retval, sealed_result, sealed_data_size);
         ocall_stopTimer(&retrieve_data_timer);
-        if (ret != SGX_SUCCESS)
-        {
+        if (ret != SGX_SUCCESS) {
             ret_error_support(ret);
         }
         ocall_stopTimer(&total_cycles);
         logger(INFO, "retrieve_data_timer = %lu", retrieve_data_timer);
         logger(INFO, "total_cycles        = %lu", total_cycles);
-    }
-    else {
+    } else {
 #ifdef SGX_COUNTERS
         uint64_t ewb = ocall_get_ewb();
 #endif
+
+
 //#ifdef PCM_COUNT
 //        ocall_set_system_counter_state("Start ecall join");
 //#endif
-PerfEvent e;
-e.startCounters();
-if(params.mode == usercheck){
-    ret = ecall_join_usercheck(global_eid,
-                               &results,
-                               &tableR,
-                               &tableS,
-                               params.algorithm_name,
-                               (int) params.nthreads,&cpu_counter);
-}else if(params.mode == preload){
-    ret = ecall_join_preload(global_eid,&results,params.algorithm_name, (int) params.nthreads,&cpu_counter);
-
-}
-e.stopCounters();
-e.printReport(std::cout,(tableR.num_tuples+tableS.num_tuples));
+        if(strcmp(params.algorithm_name, "INL") != 0){
+            e.startCounters();
+        }
+        ret = ecall_join_preload(global_eid, &results, params.algorithm_name, (int) params.nthreads, &cpu_counter,&mutex_cpu_cntr);
+        if(strcmp(params.algorithm_name, "INL") != 0){
+            e.stopCounters();
+        }
+        e.printReport(std::cout, (tableR.num_tuples + tableS.num_tuples));
 //#ifdef PCM_COUNT
 //        ocall_get_system_custom_counter_state("End ecall join");
 //#endif
@@ -518,25 +482,24 @@ e.printReport(std::cout,(tableR.num_tuples+tableS.num_tuples));
 #endif
     }
     clock_gettime(CLOCK_MONOTONIC, &tw2);
-    double  time_s = (((double) cpu_counter / 2900.0) / 1000000.0);
-    time = 1000.0*(double)tw2.tv_sec + 1e-6*(double)tw2.tv_nsec
-                        - (1000.0*(double)tw1.tv_sec + 1e-6*(double)tw1.tv_nsec);
-    logger(INFO, "Total join runtime: %.2fs", time/1000);
+    double time_s = (((double) cpu_counter / 2900.0) / 1000000.0);
+    double time_waited_mutex_s = (((double) mutex_cpu_cntr / 2900.0) / 1000000.0);
+#ifdef TIME_MUTEX
+    logger(INFO, "Time waited on mutex avg: %.4fs", time_waited_mutex_s/params.nthreads);
+#endif
     logger(INFO, "Total join runtime: %.2fs", time_s);
     logger(INFO, "throughput = %.2lf [M rec / s]",
-           (double)(params.r_size + params.s_size)/(time_s));
+           (double) (params.r_size + params.s_size) / (time_s));
     if (ret != SGX_SUCCESS) {
         ret_error_support(ret);
     }
-
 #ifdef SGX_COUNTERS
     ocall_get_sgx_counters("Destroy enclave");
 #endif
     sgx_destroy_enclave(global_eid);
     delete_relation(&tableR);
     delete_relation(&tableS);
-    if (params.seal)
-    {
+    if (params.seal) {
         free(sealed_R);
         free(sealed_S);
         free(sealed_result);

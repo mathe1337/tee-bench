@@ -115,6 +115,14 @@ MCJ(struct table_t *relR, struct table_t *relS, int nthreads) {
     return joinresult;
 }
 
+#ifdef TIME_MUTEX
+static struct algorithm_t sgx_algorithms[] = {
+        {"RHO",             RHO},
+        {"RSM",             RSM},
+        {"RHT",             RHT}
+};
+
+#else
 static struct algorithm_t sgx_algorithms[] = {
         {"PHT",             PHT},
         {"NPO_st",          NPO_st},
@@ -136,6 +144,8 @@ static struct algorithm_t sgx_algorithms[] = {
         {"RHO_seal_buffer", RHO_seal_buffer},
         {"RHO_atomic",      RHO_atomic}
 };
+
+#endif
 
 uint8_t *unseal_rel(const uint8_t *sealed_rel, size_t size) {
     uint32_t mac_text_len = sgx_get_add_mac_txt_len((const sgx_sealed_data_t *) sealed_rel);
@@ -245,7 +255,7 @@ sgx_status_t ecall_get_sealed_data(uint8_t *sealed_blob, uint32_t data_size) {
 }
 
 result_t *
-ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads, uint64_t *cpu_cntr) {
+ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads, uint64_t *cpu_cntr, uint64_t * mutex_cntr) {
     int i = 0, found = 0;
     algorithm_t *algorithm = nullptr;
     while (sgx_algorithms[i].join) {
@@ -256,6 +266,7 @@ ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int
         }
         i++;
     }
+
     if (found == 0) {
         printf("Algorithm not found: %s", algorithm_name);
         ocall_exit(EXIT_FAILURE);
@@ -271,11 +282,17 @@ ecall_join(struct table_t *relR, struct table_t *relS, char *algorithm_name, int
     usage.ru_nivcsw = 0;
     ocall_getrusage(&usage, 0);
     result_t *res;
+#ifdef TIME_MUTEX
+    {
+        rdtscpWrapper rdtscpWrapper(cpu_cntr);
+        res = algorithm->join(relR, relS, nthreads,mutex_cntr);
+    }
+#else
     {
         rdtscpWrapper rdtscpWrapper(cpu_cntr);
         res = algorithm->join(relR, relS, nthreads);
     }
-    logger(INFO, "cpu_cntr:%lu", *cpu_cntr);
+#endif
     ocall_getrusage(&usage, 1);
 
     return res;
@@ -302,19 +319,16 @@ void ecall_preload_relations(struct table_t *relR, struct table_t *relS) {
     preload = true;
 };
 
-result_t *ecall_join_usercheck(struct table_t *relR, struct table_t *relS, char *algorithm_name, int nthreads,
-                               uint64_t *cpu_cntr) {
-    return ecall_join(relR, relS, algorithm_name, nthreads, cpu_cntr);
-}
 
-result_t *ecall_join_preload(char *algorithm_name, int nthreads, uint64_t *cpu_cntr) {
+
+result_t *ecall_join_preload(char *algorithm_name, int nthreads, uint64_t *cpu_cntr, uint64_t * mutex_cntr) {
     logger(INFO, " num-tuples r: %lu", preload_relR.num_tuples);
     logger(INFO, " num-tuples s: %lu", preload_relS.num_tuples);
     if (preload)
-        return ecall_join(&preload_relR, &preload_relS, algorithm_name, nthreads, cpu_cntr);
+        return ecall_join(&preload_relR, &preload_relS, algorithm_name, nthreads, cpu_cntr, mutex_cntr);
 }
 
-void copy_relation(relation_t* src, relation_t* dest){
+void copy_relation(relation_t *src, relation_t *dest) {
 
 }
 
@@ -349,7 +363,7 @@ uint32_t ecall_join_sealed_tables(const uint8_t *sealed_r,
                                   char *algorithm,
                                   int nthreads,
                                   uint32_t seal_chunk_size) {
-    uint64_t seal_timer = 0, unseal_timer = 0, join_timer = 0;
+    /*uint64_t seal_timer = 0, unseal_timer = 0, join_timer = 0;
     relation_t *output = nullptr;
     uint32_t sealed_data_size = 0;
     ocall_startTimer(&unseal_timer);
@@ -385,6 +399,7 @@ uint32_t ecall_join_sealed_tables(const uint8_t *sealed_r,
     free(relS);
     //TODO: free result
     return sealed_data_size;
+     */
 }
 
 uint32_t ecall_three_way_join_sealed_tables(const uint8_t *sealed_r,
@@ -396,6 +411,7 @@ uint32_t ecall_three_way_join_sealed_tables(const uint8_t *sealed_r,
                                             char *algorithm,
                                             int nthreads,
                                             uint32_t seal_chunk_size) {
+    /*
     uint64_t seal_timer, unseal_timer, join1_timer, join2_timer;
     ocall_startTimer(&unseal_timer);
     relation_t *relR = (relation_t *) unseal_rel(sealed_r, size_r);
@@ -437,5 +453,5 @@ uint32_t ecall_three_way_join_sealed_tables(const uint8_t *sealed_r,
     free(relS);
     free(relT);
     //TODO: free result
-    return sealed_data_size;
+    return sealed_data_size;*/
 }

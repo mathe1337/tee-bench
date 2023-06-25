@@ -18,10 +18,33 @@
 #include "Include/data-types.h"
 #include "App/Lib/commons.h"
 #include "nested_loop_join.h"
+#include "rdtscpWrapper.h"
 
 using namespace std;
 
 struct timespec ts_start;
+static inline u_int64_t rdtsc(void)
+{
+    u_int32_t hi, lo;
+
+    __asm__ __volatile__("rdtsc"
+            : "=a"(lo), "=d"(hi));
+
+    return (u_int64_t(hi) << 32) | u_int64_t(lo);
+}
+PerfEvent e;
+char algorithm_name[128];
+void ocall_startTimer(u_int64_t *t) {
+    if(strcmp(algorithm_name,"INL") == 0)
+        e.startCounters();
+    *t = rdtsc();
+}
+
+void ocall_stopTimer(u_int64_t *t) {
+    *t = rdtsc() - *t;
+    if(strcmp(algorithm_name,"INL") == 0)
+        e.stopCounters();
+}
 
 result_t * CHT(relation_t *relR, relation_t* relS, int nthreads)
 {
@@ -31,20 +54,31 @@ result_t * CHT(relation_t *relR, relation_t* relS, int nthreads)
     return res;
 }
 
+#ifdef TIME_MUTEX
 static struct algorithm_t algorithms[] = {
-        {"PHT", PHT},
-        {"NPO_st", NPO_st},
-        {"NL", NL},
-        {"RJ", RJ},
-        {"PSM", PSM},
-        {"RHO", RHO},
-        {"RHT", RHT},
-        {"RSM", RSM},
-        {"CHT", CHT},
-        {"INL", INL},
-        {"MWAY", MWAY}
+        {"RHO",             RHO},
+        {"RSM",             RSM},
+        {"RHT",             RHT}
+
 };
 
+#else
+static struct algorithm_t algorithms[] = {
+        {"PHT",             PHT},
+        {"NPO_st",          NPO_st},
+        {"NL",              NL},
+        {"INL",             INL},
+        {"RJ",              RJ},
+        {"RHO",             RHO},
+        {"RHT",             RHT},
+        {"PSM",             PSM},
+        {"RSM",             RSM},
+        {"CHT",             CHT},
+        {"MWAY",            MWAY},
+        {"RHO_seal_buffer", RHO_seal_buffer}
+};
+
+#endif
 int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
     logger(INFO, "Welcome from native!");
@@ -139,13 +173,37 @@ int main(int argc, char *argv[]) {
     logger(DBG, "DONE");
 
     logger(INFO, "Running algorithm %s", params.algorithm->name);
-    PerfEvent e;
-    e.startCounters();
     clock_t start = clock();
-    result_t* matches = params.algorithm->join(&tableR, &tableS, params.nthreads);
-    logger(INFO, "Total join runtime: %.2fs", (clock() - start)/ (float)(CLOCKS_PER_SEC));
+    uint64_t cpu_cntr = 0;
+    strcpy(algorithm_name, params.algorithm_name);
+    result_t* matches;
+#ifdef TIME_MUTEX
+    uint64_t mutex_cpu_cntr = 0;
+    {
+        rdtscpWrapper rdtscpWrapper(&cpu_cntr);
+        matches = params.algorithm->join(&tableR, &tableS, params.nthreads,&mutex_cpu_cntr);
+    }
+#else
+    if(strcmp(params.algorithm_name, "INL") != 0){
+        e.startCounters();
+    }
+    {
+        rdtscpWrapper rdtscpWrapper(&cpu_cntr);
+        matches = params.algorithm->join(&tableR, &tableS, params.nthreads);
+    }
+    if(strcmp(params.algorithm_name, "INL") != 0){
+        e.stopCounters();
+    }
+#endif
+    double time_s = (((double) cpu_cntr / 2900.0) / 1000000.0);
+#ifdef TIME_MUTEX
+    double time_waited_mutex_s = (((double) mutex_cpu_cntr / 2900.0) / 1000000.0);
+    logger(INFO, "Time waited on mutex avg: %.4fs", time_waited_mutex_s/params.nthreads);
+#endif
+    logger(INFO, "Total join runtime: %.2fs", time_s);
+    logger(INFO, "throughput = %.2lf [M rec / s]",
+           (double) (params.r_size + params.s_size) / (time_s));
     logger(INFO, "Matches = %lu", matches->totalresults);
-    e.stopCounters();
     e.printReport(std::cout,(tableR.num_tuples+tableS.num_tuples));
     delete_relation(&tableR);
     delete_relation(&tableS);

@@ -13,6 +13,7 @@
 #include "Logger.h"
 #include "malloc.h"
 #else
+
 #include "Enclave.h"
 #include "Enclave_t.h"
 #include <sgx_tseal.h>
@@ -54,15 +55,15 @@
  */
 typedef union {
     struct {
-        tuple_t tuples[CACHE_LINE_SIZE/sizeof(tuple_t)];
+        tuple_t tuples[CACHE_LINE_SIZE / sizeof(tuple_t)];
     } tuples;
     struct {
-        tuple_t tuples[CACHE_LINE_SIZE/sizeof(tuple_t) - 1];
+        tuple_t tuples[CACHE_LINE_SIZE / sizeof(tuple_t) - 1];
         int32_t slot;
     } data;
 } cache_line_t;
 
-typedef struct arg_t_radix  arg_t_radix;
+typedef struct arg_t_radix arg_t_radix;
 typedef struct part_t part_t;
 //typedef int64_t (*JoinFunction)(const struct table_t * const,
 //                                const struct table_t * const,
@@ -71,35 +72,39 @@ typedef struct part_t part_t;
 
 /** holds the arguments passed to each thread */
 struct arg_t_radix {
-    int32_t ** histR;
-    struct row_t *  relR;
-    struct row_t *  tmpR;
-    int32_t ** histS;
-    struct row_t *  relS;
-    struct row_t *  tmpS;
+    int32_t **histR;
+    struct row_t *relR;
+    struct row_t *tmpR;
+    int32_t **histS;
+    struct row_t *relS;
+    struct row_t *tmpS;
 
     uint64_t numR;
     uint64_t numS;
     uint64_t totalR;
     uint64_t totalS;
 
-    task_queue_t *      join_queue;
-    task_queue_t *      part_queue;
+    task_queue_t *join_queue;
+    task_queue_t *part_queue;
 #ifdef SKEW_HANDLING
     task_queue_t *      skew_queue;
     task_t **           skewtask;
 #endif
-    pthread_barrier_t * barrier;
-    JoinFunction        join_function;
+    pthread_barrier_t *barrier;
+    JoinFunction join_function;
     int64_t result;
     int32_t my_tid;
-    int     nthreads;
+    int nthreads;
 
     /* stats about the thread */
-    int32_t        parts_processed;
-    uint64_t       timer1, timer2, timer3;
-    uint64_t       start, end;
-    uint64_t       pass1, pass2;
+    int32_t parts_processed;
+    uint64_t timer1, timer2, timer3;
+    uint64_t start, end;
+    uint64_t pass1, pass2;
+#ifdef TIME_MUTEX
+    uint64_t * cpu_counter_mutex;
+#endif
+
 #ifdef SYNCSTATS
     /** Thread local timers : */
     synctimer_t localtimer;
@@ -115,17 +120,17 @@ struct arg_t_radix {
 
 /** holds arguments passed for partitioning */
 struct part_t {
-    struct row_t *  rel;
-    struct row_t *  tmp;
-    int32_t ** hist;
-    int32_t *  output;
-    arg_t_radix   *  thrargs;
-    uint32_t   num_tuples;
-    uint32_t   total_tuples;
-    int32_t    R;
-    uint32_t   D;
-    int        relidx;  /* 0: R, 1: S */
-    uint32_t   padding;
+    struct row_t *rel;
+    struct row_t *tmp;
+    int32_t **hist;
+    int32_t *output;
+    arg_t_radix *thrargs;
+    uint32_t num_tuples;
+    uint32_t total_tuples;
+    int32_t R;
+    uint32_t D;
+    int relidx;  /* 0: R, 1: S */
+    uint32_t padding;
 } __attribute__((aligned(CACHE_LINE_SIZE)));
 
 //void malloc_check(void* m) {
@@ -136,9 +141,8 @@ struct part_t {
 //}
 
 static void *
-alloc_aligned(size_t size)
-{
-    void * ret;
+alloc_aligned(size_t size) {
+    void *ret;
     ret = memalign(CACHE_LINE_SIZE, size);
 
     malloc_check(ret);
@@ -152,17 +156,17 @@ void print_timing(uint64_t total, uint64_t build, uint64_t part,
                   uint64_t pass1, uint64_t pass2) {
     double cyclestuple = (double) total / (double) numtuples;
     uint64_t time_usec = end - start;
-    double throughput = numtuples  / (double)time_usec;
+    double throughput = numtuples / (double) time_usec;
     logger(ENCLAVE, "Total input tuples : %u", numtuples);
     logger(ENCLAVE, "Result tuples : %lu", result);
     logger(ENCLAVE, "Phase Total (cycles) : %lu", total);
     logger(ENCLAVE, "Phase Partition (cycles) : %lu", part);
     logger(ENCLAVE, "Phase Join (cycles) : %lu", build);
     logger(ENCLAVE, "Cycles-per-tuple           : %.4lf", cyclestuple);
-    logger(ENCLAVE, "Cycles-per-tuple-partition : %.4lf", (double)part/numtuples);
-    logger(ENCLAVE, "Cycles-per-tuple-pass1     : %.4lf", (double)pass1/numtuples);
-    logger(ENCLAVE, "Cycles-per-tuple-pass2     : %.4lf", (double)pass2/numtuples);
-    logger(ENCLAVE, "Cycles-per-tuple-join      : %.4lf", (double)build/numtuples);
+    logger(ENCLAVE, "Cycles-per-tuple-partition : %.4lf", (double) part / numtuples);
+    logger(ENCLAVE, "Cycles-per-tuple-pass1     : %.4lf", (double) pass1 / numtuples);
+    logger(ENCLAVE, "Cycles-per-tuple-pass2     : %.4lf", (double) pass2 / numtuples);
+    logger(ENCLAVE, "Cycles-per-tuple-join      : %.4lf", (double) build / numtuples);
     logger(ENCLAVE, "Total Runtime (us) : %lu ", time_usec);
     logger(ENCLAVE, "Throughput (M rec/sec) : %.2lf", throughput);
 #ifdef SGX_COUNTERS
@@ -185,50 +189,49 @@ void print_timing(uint64_t total, uint64_t build, uint64_t part,
  * @return number of result tuples
  */
 int64_t
-bucket_chaining_join(const struct table_t * const R,
-                     const struct table_t * const S,
-                     struct table_t * const tmpR,
-                     output_list_t ** output)
-{
+bucket_chaining_join(const struct table_t *const R,
+                     const struct table_t *const S,
+                     struct table_t *const tmpR,
+                     output_list_t **output) {
     (void) (tmpR);
     (void) (output);
-    int * next, * bucket;
+    int *next, *bucket;
     const uint64_t numR = R->num_tuples;
     uint32_t N = numR;
     int64_t matches = 0;
 
     NEXT_POW_2(N);
     /* N <<= 1; */
-    const uint32_t MASK = (N-1) << (NUM_RADIX_BITS);
+    const uint32_t MASK = (N - 1) << (NUM_RADIX_BITS);
 
-    next   = (int*) malloc(sizeof(int) * numR);
+    next = (int *) malloc(sizeof(int) * numR);
     /* posix_memalign((void**)&next, CACHE_LINE_SIZE, numR * sizeof(int)); */
-    bucket = (int*) calloc(N, sizeof(int));
+    bucket = (int *) calloc(N, sizeof(int));
 
-    const struct row_t * const Rtuples = R->tuples;
-    for(uint32_t i=0; i < numR; ){
+    const struct row_t *const Rtuples = R->tuples;
+    for (uint32_t i = 0; i < numR;) {
         uint32_t idx = HASH_BIT_MODULO(R->tuples[i].key, MASK, NUM_RADIX_BITS);
-        next[i]      = bucket[idx];
-        bucket[idx]  = ++i;     /* we start pos's from 1 instead of 0 */
+        next[i] = bucket[idx];
+        bucket[idx] = ++i;     /* we start pos's from 1 instead of 0 */
 
         /* Enable the following tO avoid the code elimination
            when running probe only for the time break-down experiment */
         /* matches += idx; */
     }
 
-    const struct row_t * const Stuples = S->tuples;
-    const uint64_t        numS    = S->num_tuples;
+    const struct row_t *const Stuples = S->tuples;
+    const uint64_t numS = S->num_tuples;
 
     /* Disable the following loop for no-probe for the break-down experiments */
     /* PROBE- LOOP */
-    for(uint32_t i=0; i < numS; i++ ){
+    for (uint32_t i = 0; i < numS; i++) {
 
         uint32_t idx = HASH_BIT_MODULO(Stuples[i].key, MASK, NUM_RADIX_BITS);
 
-        for(int hit = bucket[idx]; hit > 0; hit = next[hit-1]){
+        for (int hit = bucket[idx]; hit > 0; hit = next[hit - 1]) {
 
-            if(Stuples[i].key == Rtuples[hit-1].key){
-                matches ++;
+            if (Stuples[i].key == Rtuples[hit - 1].key) {
+                matches++;
 #ifdef JOIN_MATERIALIZE
                 insert_output(output, Stuples[i].key, Rtuples[hit-1].payload, Stuples[i].payload);
 #endif
@@ -248,52 +251,51 @@ int64_t
 bucket_chaining_join_with_sealing_buffer(const struct table_t *const R,
                                          const struct table_t *const S,
                                          struct table_t *const tmpR,
-                                         output_list_t **output)
-{
+                                         output_list_t **output) {
     (void) (tmpR);
     (void) (output);
-    int * next, * bucket;
+    int *next, *bucket;
     const uint64_t numR = R->num_tuples;
     uint32_t N = numR;
     int64_t matches = 0;
     char aad_mac_text[256] = "SgxJoinEvaluation";
 
-    tuple_t * output_buf = (tuple_t*) malloc(SEAL_BUF_RECORDS * sizeof(tuple_t));
+    tuple_t *output_buf = (tuple_t *) malloc(SEAL_BUF_RECORDS * sizeof(tuple_t));
     uint32_t in_buffer = 0;
 
     NEXT_POW_2(N);
     /* N <<= 1; */
-    const uint32_t MASK = (N-1) << (NUM_RADIX_BITS);
+    const uint32_t MASK = (N - 1) << (NUM_RADIX_BITS);
 
-    next   = (int*) malloc(sizeof(int) * numR);
+    next = (int *) malloc(sizeof(int) * numR);
     /* posix_memalign((void**)&next, CACHE_LINE_SIZE, numR * sizeof(int)); */
-    bucket = (int*) calloc(N, sizeof(int));
+    bucket = (int *) calloc(N, sizeof(int));
 
-    const struct row_t * const Rtuples = R->tuples;
-    for(uint32_t i=0; i < numR; ){
+    const struct row_t *const Rtuples = R->tuples;
+    for (uint32_t i = 0; i < numR;) {
         uint32_t idx = HASH_BIT_MODULO(R->tuples[i].key, MASK, NUM_RADIX_BITS);
-        next[i]      = bucket[idx];
-        bucket[idx]  = ++i;     /* we start pos's from 1 instead of 0 */
+        next[i] = bucket[idx];
+        bucket[idx] = ++i;     /* we start pos's from 1 instead of 0 */
 
         /* Enable the following tO avoid the code elimination
            when running probe only for the time break-down experiment */
         /* matches += idx; */
     }
 
-    const struct row_t * const Stuples = S->tuples;
-    const uint64_t        numS    = S->num_tuples;
+    const struct row_t *const Stuples = S->tuples;
+    const uint64_t numS = S->num_tuples;
 
-    uint8_t* sealed_buffer = nullptr;
+    uint8_t *sealed_buffer = nullptr;
     /* Disable the following loop for no-probe for the break-down experiments */
     /* PROBE- LOOP */
-    for(uint32_t i=0; i < numS; i++ ){
+    for (uint32_t i = 0; i < numS; i++) {
 
         uint32_t idx = HASH_BIT_MODULO(Stuples[i].key, MASK, NUM_RADIX_BITS);
 
-        for(int hit = bucket[idx]; hit > 0; hit = next[hit-1]){
+        for (int hit = bucket[idx]; hit > 0; hit = next[hit - 1]) {
 
-            if(Stuples[i].key == Rtuples[hit-1].key){
-                matches ++;
+            if (Stuples[i].key == Rtuples[hit - 1].key) {
+                matches++;
 #ifndef NATIVE_COMPILATION
                 output_buf[in_buffer].key = Stuples[i].key;
                 output_buf[in_buffer].payload = Stuples[i].payload;
@@ -301,16 +303,15 @@ bucket_chaining_join_with_sealing_buffer(const struct table_t *const R,
                 if (in_buffer >= SEAL_BUF_RECORDS) {
                     uint32_t output_size = SEAL_BUF_RECORDS * sizeof(tuple_t);
                     uint32_t sealed_buffer_size =
-                            sgx_calc_sealed_data_size((uint32_t)strlen(aad_mac_text), output_size);
-                    sealed_buffer = (uint8_t*) malloc(sealed_buffer_size);
-                    sgx_status_t err = sgx_seal_data((uint32_t)strlen(aad_mac_text),
+                            sgx_calc_sealed_data_size((uint32_t) strlen(aad_mac_text), output_size);
+                    sealed_buffer = (uint8_t *) malloc(sealed_buffer_size);
+                    sgx_status_t err = sgx_seal_data((uint32_t) strlen(aad_mac_text),
                                                      (const uint8_t *) aad_mac_text,
                                                      output_size,
-                                                     (uint8_t*) output_buf,
+                                                     (uint8_t *) output_buf,
                                                      sealed_buffer_size,
                                                      (sgx_sealed_data_t *) sealed_buffer);
-                    if (err != SGX_SUCCESS)
-                    {
+                    if (err != SGX_SUCCESS) {
                         logger(DBG, "Sealing error: %d", err);
                     }
                     in_buffer = 0;
@@ -324,16 +325,15 @@ bucket_chaining_join_with_sealing_buffer(const struct table_t *const R,
     if (in_buffer > 0) {
         uint32_t output_size = SEAL_BUF_RECORDS * sizeof(tuple_t);
         uint32_t sealed_buffer_size =
-                sgx_calc_sealed_data_size((uint32_t)strlen(aad_mac_text), output_size);
-        sealed_buffer = (uint8_t*) malloc(sealed_buffer_size);
-        sgx_status_t err = sgx_seal_data((uint32_t)strlen(aad_mac_text),
+                sgx_calc_sealed_data_size((uint32_t) strlen(aad_mac_text), output_size);
+        sealed_buffer = (uint8_t *) malloc(sealed_buffer_size);
+        sgx_status_t err = sgx_seal_data((uint32_t) strlen(aad_mac_text),
                                          (const uint8_t *) aad_mac_text,
                                          output_size,
-                                         (uint8_t*) output_buf,
+                                         (uint8_t *) output_buf,
                                          sealed_buffer_size,
                                          (sgx_sealed_data_t *) sealed_buffer);
-        if (err != SGX_SUCCESS)
-        {
+        if (err != SGX_SUCCESS) {
             logger(DBG, "Sealing error: %d", err);
         }
         in_buffer = 0;
@@ -357,11 +357,10 @@ get_hist_size(uint32_t relSize) __attribute__((always_inline));
 
 inline
 uint32_t
-get_hist_size(uint32_t relSize)
-{
+get_hist_size(uint32_t relSize) {
     NEXT_POW_2(relSize);
     relSize >>= 2;
-    if(relSize < 4) relSize = 4;
+    if (relSize < 4) relSize = 4;
     return relSize;
 }
 
@@ -372,60 +371,59 @@ get_hist_size(uint32_t relSize)
  * radix join implementation using this function is PRH.
  */
 int64_t
-histogram_join(const relation_t * const R,
-               const relation_t * const S,
-               relation_t * const tmpR,
-               output_list_t ** output)
-{
+histogram_join(const relation_t *const R,
+               const relation_t *const S,
+               relation_t *const tmpR,
+               output_list_t **output) {
     (void) (output);
-    int32_t * hist;
-    const tuple_t * const Rtuples = R->tuples;
-    const uint64_t numR  = R->num_tuples;
-    uint32_t       Nhist = get_hist_size(numR);
-    const uint32_t MASK  = (Nhist-1) << NUM_RADIX_BITS;
+    int32_t *hist;
+    const tuple_t *const Rtuples = R->tuples;
+    const uint64_t numR = R->num_tuples;
+    uint32_t Nhist = get_hist_size(numR);
+    const uint32_t MASK = (Nhist - 1) << NUM_RADIX_BITS;
 
-    hist   = (int32_t*) calloc(Nhist+2, sizeof(int32_t));
+    hist = (int32_t *) calloc(Nhist + 2, sizeof(int32_t));
 
-    for( uint32_t i = 0; i < numR; i++ ) {
+    for (uint32_t i = 0; i < numR; i++) {
 
         uint32_t idx = HASH_BIT_MODULO(Rtuples[i].key, MASK, NUM_RADIX_BITS);
 
-        hist[idx+2] ++;
+        hist[idx + 2]++;
     }
 
     /* prefix sum on histogram */
-    for( uint32_t i = 2, sum = 0; i <= Nhist+1; i++ ) {
-        sum     += hist[i];
-        hist[i]  = sum;
+    for (uint32_t i = 2, sum = 0; i <= Nhist + 1; i++) {
+        sum += hist[i];
+        hist[i] = sum;
     }
 
-    tuple_t * const tmpRtuples = tmpR->tuples;
+    tuple_t *const tmpRtuples = tmpR->tuples;
     /* reorder tuples according to the prefix sum */
-    for( uint32_t i = 0; i < numR; i++ ) {
+    for (uint32_t i = 0; i < numR; i++) {
 
         uint32_t idx = HASH_BIT_MODULO(Rtuples[i].key, MASK, NUM_RADIX_BITS) + 1;
 
         tmpRtuples[hist[idx]] = Rtuples[i];
 
-        hist[idx] ++;
+        hist[idx]++;
     }
 
-    int64_t              match   = 0;
-    const uint64_t        numS    = S->num_tuples;
-    const tuple_t * const Stuples = S->tuples;
+    int64_t match = 0;
+    const uint64_t numS = S->num_tuples;
+    const tuple_t *const Stuples = S->tuples;
     /* now comes the probe phase, TODO: implement prefetching */
-    for( uint32_t i = 0; i < numS; i++ ) {
+    for (uint32_t i = 0; i < numS; i++) {
 
         uint32_t idx = HASH_BIT_MODULO(Stuples[i].key, MASK, NUM_RADIX_BITS);
 
-        int j = hist[idx], end = hist[idx+1];
+        int j = hist[idx], end = hist[idx + 1];
 
         /* Scalar comparisons */
-        for(; j < end; j++) {
+        for (; j < end; j++) {
 
-            if(Stuples[i].key == tmpRtuples[j].key) {
+            if (Stuples[i].key == tmpRtuples[j].key) {
 
-                ++ match;
+                ++match;
 #ifdef JOIN_MATERIALIZE
                 insert_output(output, Stuples[i].key, tmpRtuples[j].payload, Stuples[i].payload);
 #endif
@@ -452,45 +450,44 @@ histogram_join(const relation_t * const R,
  * @param D
  */
 void
-radix_cluster_nopadding(struct table_t * outRel, struct table_t * inRel, int R, int D)
-{
-    row_t ** dst;
-    row_t * input;
+radix_cluster_nopadding(struct table_t *outRel, struct table_t *inRel, int R, int D) {
+    row_t **dst;
+    row_t *input;
     /* tuple_t ** dst_end; */
-    uint32_t * tuples_per_cluster;
+    uint32_t *tuples_per_cluster;
     uint32_t i;
     uint32_t offset;
     const uint32_t M = ((1 << D) - 1) << R;
     const uint32_t fanOut = 1 << D;
     const uint64_t ntuples = inRel->num_tuples;
 
-    tuples_per_cluster = (uint32_t*)calloc(fanOut, sizeof(uint32_t));
+    tuples_per_cluster = (uint32_t *) calloc(fanOut, sizeof(uint32_t));
     /* the following are fixed size when D is same for all the passes,
        and can be re-used from call to call. Allocating in this function
        just in case D differs from call to call. */
-    dst     = (row_t**)malloc(sizeof(row_t*)*fanOut);
+    dst = (row_t **) malloc(sizeof(row_t * ) * fanOut);
     /* dst_end = (tuple_t**)malloc(sizeof(tuple_t*)*fanOut); */
 
     input = inRel->tuples;
     /* count tuples per cluster */
-    for( i=0; i < ntuples; i++ ){
-        uint32_t idx = (uint32_t)(HASH_BIT_MODULO(input->key, M, R));
+    for (i = 0; i < ntuples; i++) {
+        uint32_t idx = (uint32_t) (HASH_BIT_MODULO(input->key, M, R));
         tuples_per_cluster[idx]++;
         input++;
     }
 
     offset = 0;
     /* determine the start and end of each cluster depending on the counts. */
-    for ( i=0; i < fanOut; i++ ) {
-        dst[i]      = outRel->tuples + offset;
-        offset     += tuples_per_cluster[i];
+    for (i = 0; i < fanOut; i++) {
+        dst[i] = outRel->tuples + offset;
+        offset += tuples_per_cluster[i];
         /* dst_end[i]  = outRel->tuples + offset; */
     }
 
     input = inRel->tuples;
     /* copy tuples to their corresponding clusters at appropriate offsets */
-    for( i=0; i < ntuples; i++ ){
-        uint32_t idx   = (uint32_t)(HASH_BIT_MODULO(input->key, M, R));
+    for (i = 0; i < ntuples; i++) {
+        uint32_t idx = (uint32_t) (HASH_BIT_MODULO(input->key, M, R));
         *dst[idx] = *input;
         ++dst[idx];
         input++;
@@ -523,12 +520,11 @@ radix_cluster_nopadding(struct table_t * outRel, struct table_t * inRel, int R, 
  * @returns tuples per partition.
  */
 void
-radix_cluster(struct table_t * outRel,
-              struct table_t * inRel,
-              int64_t * hist,
+radix_cluster(struct table_t *outRel,
+              struct table_t *inRel,
+              int64_t *hist,
               int R,
-              int D)
-{
+              int D) {
     uint64_t i;
     uint32_t M = ((1 << D) - 1) << R;
     uint32_t offset;
@@ -540,13 +536,13 @@ radix_cluster(struct table_t * outRel,
     uint32_t dst[fanOut];
 
     /* count tuples per cluster */
-    for( i=0; i < inRel->num_tuples; i++ ){
+    for (i = 0; i < inRel->num_tuples; i++) {
         uint64_t idx = HASH_BIT_MODULO(inRel->tuples[i].key, M, R);
         hist[idx]++;
     }
     offset = 0;
     /* determine the start and end of each cluster depending on the counts. */
-    for ( i=0; i < fanOut; i++ ) {
+    for (i = 0; i < fanOut; i++) {
         /* dst[i]      = outRel->tuples + offset; */
         /* determine the beginning of each partitioning by adding some
            padding to avoid L1 conflict misses during scatter. */
@@ -555,9 +551,9 @@ radix_cluster(struct table_t * outRel,
     }
 
     /* copy tuples to their corresponding clusters at appropriate offsets */
-    for( i=0; i < inRel->num_tuples; i++ ){
-        uint32_t idx   = HASH_BIT_MODULO(inRel->tuples[i].key, M, R);
-        outRel->tuples[ dst[idx] ] = inRel->tuples[i];
+    for (i = 0; i < inRel->num_tuples; i++) {
+        uint32_t idx = HASH_BIT_MODULO(inRel->tuples[i].key, M, R);
+        outRel->tuples[dst[idx]] = inRel->tuples[i];
         ++dst[idx];
     }
 }
@@ -571,17 +567,24 @@ radix_cluster(struct table_t * outRel,
  * @param task description of the relation to be partitioned
  * @param join_queue task queue to add join tasks after clustering
  */
+#ifdef TIME_MUTEX
 void serial_radix_partition(task_t * const task,
                             task_queue_t * join_queue,
-                            const int R, const int D)
+                            const int R, const int D,uint64_t * mutex_time_cntr)
 {
+#else
+
+void serial_radix_partition(task_t *const task,
+                            task_queue_t *join_queue,
+                            const int R, const int D) {
+#endif
     int i;
     uint64_t offsetR = 0, offsetS = 0;
     const int fanOut = 1 << D;  /*(NUM_RADIX_BITS / NUM_PASSES);*/
-    int64_t * outputR, * outputS;
+    int64_t *outputR, *outputS;
 
-    outputR = (int64_t*)calloc(fanOut+1, sizeof(int64_t));
-    outputS = (int64_t*)calloc(fanOut+1, sizeof(int64_t));
+    outputR = (int64_t *) calloc(fanOut + 1, sizeof(int64_t));
+    outputS = (int64_t *) calloc(fanOut + 1, sizeof(int64_t));
     /* TODO: measure the effect of memset() */
     /* memset(outputR, 0, fanOut * sizeof(int32_t)); */
     radix_cluster(&task->tmpR, &task->relR, outputR, R, D);
@@ -590,9 +593,13 @@ void serial_radix_partition(task_t * const task,
     radix_cluster(&task->tmpS, &task->relS, outputS, R, D);
 
     /* task_t t; */
-    for(i = 0; i < fanOut; i++) {
-        if(outputR[i] > 0 && outputS[i] > 0) {
-            task_t * t = task_queue_get_slot_atomic(join_queue);
+    for (i = 0; i < fanOut; i++) {
+        if (outputR[i] > 0 && outputS[i] > 0) {
+#ifdef TIME_MUTEX
+            task_t * t = task_queue_get_slot_atomic_timed(join_queue, mutex_time_cntr);
+#else
+            task_t *t = task_queue_get_slot_atomic(join_queue);
+#endif
             t->relR.num_tuples = outputR[i];
             t->relR.tuples = task->tmpR.tuples + offsetR
                              + i * SMALL_PADDING_TUPLES;
@@ -608,9 +615,12 @@ void serial_radix_partition(task_t * const task,
             offsetS += outputS[i];
 
             /* task_queue_copy_atomic(join_queue, &t); */
+#ifdef TIME_MUTEX
+            task_queue_add_atomic_timed(join_queue, t, mutex_time_cntr);
+#else
             task_queue_add_atomic(join_queue, t);
-        }
-        else {
+#endif
+        } else {
             offsetR += outputR[i];
             offsetS += outputS[i];
         }
@@ -628,24 +638,22 @@ void serial_radix_partition(task_t * const task,
  * @param part description of the relation to be partitioned
  */
 void
-parallel_radix_partition(part_t * const part)
-{
-    const struct row_t * rel = part->rel;
-    int32_t **           hist  = part->hist;
-    int32_t *       output   = part->output;
+parallel_radix_partition(part_t *const part) {
+    const struct row_t *rel = part->rel;
+    int32_t **hist = part->hist;
+    int32_t *output = part->output;
 
-    const uint32_t my_tid     = part->thrargs->my_tid;
-    const uint32_t nthreads   = part->thrargs->nthreads;
-    const uint32_t size       = part->num_tuples;
+    const uint32_t my_tid = part->thrargs->my_tid;
+    const uint32_t nthreads = part->thrargs->nthreads;
+    const uint32_t size = part->num_tuples;
 
-    const int32_t  R       = part->R;
-    const int32_t  D       = part->D;
-    const uint32_t fanOut  = 1 << D;
-    const uint32_t MASK    = (fanOut - 1) << R;
+    const int32_t R = part->R;
+    const int32_t D = part->D;
+    const uint32_t fanOut = 1 << D;
+    const uint32_t MASK = (fanOut - 1) << R;
     const uint32_t padding = part->padding;
 
-    if(my_tid == 0)
-    {
+    if (my_tid == 0) {
         logger(DBG, "Radix partitioning. R=%d, D=%d, fanout=%d, MASK=%d",
                R, D, fanOut, MASK);
     }
@@ -654,19 +662,19 @@ parallel_radix_partition(part_t * const part)
     uint32_t i, j;
     int rv = 0;
 
-    int32_t dst[fanOut+1];
+    int32_t dst[fanOut + 1];
 
     /* compute local histogram for the assigned region of rel */
     /* compute histogram */
-    int32_t * my_hist = hist[my_tid];
+    int32_t *my_hist = hist[my_tid];
 
-    for(i = 0; i < size; i++) {
+    for (i = 0; i < size; i++) {
         uint32_t idx = HASH_BIT_MODULO(rel[i].key, MASK, R);
-        my_hist[idx] ++;
+        my_hist[idx]++;
     }
 
     /* compute local prefix sum on hist */
-    for(i = 0; i < fanOut; i++){
+    for (i = 0; i < fanOut; i++) {
         sum += my_hist[i];
         my_hist[i] = sum;
     }
@@ -678,25 +686,25 @@ parallel_radix_partition(part_t * const part)
     SYNC_GLOBAL_STOP(&part->thrargs->globaltimer->sync1[part->relidx], my_tid);
 
     /* determine the start and end of each cluster */
-    for(i = 0; i < my_tid; i++) {
-        for(j = 0; j < fanOut; j++)
+    for (i = 0; i < my_tid; i++) {
+        for (j = 0; j < fanOut; j++)
             output[j] += hist[i][j];
     }
-    for(i = my_tid; i < nthreads; i++) {
-        for(j = 1; j < fanOut; j++)
-            output[j] += hist[i][j-1];
+    for (i = my_tid; i < nthreads; i++) {
+        for (j = 1; j < fanOut; j++)
+            output[j] += hist[i][j - 1];
     }
 
-    for(i = 0; i < fanOut; i++ ) {
+    for (i = 0; i < fanOut; i++) {
         output[i] += i * padding; //PADDING_TUPLES;
         dst[i] = output[i];
     }
     output[fanOut] = part->total_tuples + fanOut * padding; //PADDING_TUPLES;
 
-    struct row_t * tmp = part->tmp;
+    struct row_t *tmp = part->tmp;
 
     /* Copy tuples to their corresponding clusters */
-    for(i = 0; i < size; i++ ){
+    for (i = 0; i < size; i++) {
         uint32_t idx = HASH_BIT_MODULO(rel[i].key, MASK, R);
         tmp[dst[idx]] = rel[i];
         ++dst[idx];
@@ -714,10 +722,9 @@ parallel_radix_partition(part_t * const part)
  * @return
  */
 static inline void
-store_nontemp_64B(void * dst, void * src)
-{
+store_nontemp_64B(void *dst, void *src) {
     /* just copy with assignment */
-    *(cache_line_t *)dst = *(cache_line_t *)src;
+    *(cache_line_t *) dst = *(cache_line_t *) src;
 }
 
 
@@ -732,20 +739,19 @@ store_nontemp_64B(void * dst, void * src)
  * @param part description of the relation to be partitioned
  */
 void
-parallel_radix_partition_optimized(part_t * const part)
-{
-    const tuple_t * rel    = part->rel;
-    int32_t **      hist   = part->hist;
-    int32_t *       output = part->output;
+parallel_radix_partition_optimized(part_t *const part) {
+    const tuple_t *rel = part->rel;
+    int32_t **hist = part->hist;
+    int32_t *output = part->output;
 
-    const uint32_t my_tid     = part->thrargs->my_tid;
-    const uint32_t nthreads   = part->thrargs->nthreads;
+    const uint32_t my_tid = part->thrargs->my_tid;
+    const uint32_t nthreads = part->thrargs->nthreads;
     const uint32_t num_tuples = part->num_tuples;
 
-    const int32_t  R       = part->R;
-    const int32_t  D       = part->D;
-    const uint32_t fanOut  = 1 << D;
-    const uint32_t MASK    = (fanOut - 1) << R;
+    const int32_t R = part->R;
+    const int32_t D = part->D;
+    const uint32_t fanOut = 1 << D;
+    const uint32_t MASK = (fanOut - 1) << R;
     const uint32_t padding = part->padding;
 
     int32_t sum = 0;
@@ -754,15 +760,15 @@ parallel_radix_partition_optimized(part_t * const part)
 
     /* compute local histogram for the assigned region of rel */
     /* compute histogram */
-    int32_t * my_hist = hist[my_tid];
+    int32_t *my_hist = hist[my_tid];
 
-    for(i = 0; i < num_tuples; i++) {
+    for (i = 0; i < num_tuples; i++) {
         uint32_t idx = HASH_BIT_MODULO(rel[i].key, MASK, R);
-        my_hist[idx] ++;
+        my_hist[idx]++;
     }
 
     /* compute local prefix sum on hist */
-    for(i = 0; i < fanOut; i++){
+    for (i = 0; i < fanOut; i++) {
         sum += my_hist[i];
         my_hist[i] = sum;
     }
@@ -774,55 +780,55 @@ parallel_radix_partition_optimized(part_t * const part)
     SYNC_GLOBAL_STOP(&part->thrargs->globaltimer->sync1[part->relidx], my_tid);
 
     /* determine the start and end of each cluster */
-    for(i = 0; i < my_tid; i++) {
-        for(j = 0; j < fanOut; j++)
+    for (i = 0; i < my_tid; i++) {
+        for (j = 0; j < fanOut; j++)
             output[j] += hist[i][j];
     }
-    for(i = my_tid; i < nthreads; i++) {
-        for(j = 1; j < fanOut; j++)
-            output[j] += hist[i][j-1];
+    for (i = my_tid; i < nthreads; i++) {
+        for (j = 1; j < fanOut; j++)
+            output[j] += hist[i][j - 1];
     }
 
     /* uint32_t pre; /\* nr of tuples to cache-alignment *\/ */
-    tuple_t * tmp = part->tmp;
+    tuple_t *tmp = part->tmp;
     /* software write-combining buffer */
     cache_line_t buffer[fanOut] __attribute__((aligned(CACHE_LINE_SIZE)));
 
-    for(i = 0; i < fanOut; i++ ) {
+    for (i = 0; i < fanOut; i++) {
         uint32_t off = output[i] + i * padding;
         /* pre        = (off + TUPLESPERCACHELINE) & ~(TUPLESPERCACHELINE-1); */
         /* pre       -= off; */
-        output[i]  = off;
+        output[i] = off;
         buffer[i].data.slot = off;
     }
     output[fanOut] = part->total_tuples + fanOut * padding;
 
     /* Copy tuples to their corresponding clusters */
-    for(i = 0; i < num_tuples; i++ ){
-        uint32_t  idx     = HASH_BIT_MODULO(rel[i].key, MASK, R);
-        uint32_t  slot    = buffer[idx].data.slot;
-        tuple_t * tup     = (tuple_t *)(buffer + idx);
-        uint32_t  slotMod = (slot) & (TUPLESPERCACHELINE - 1);
-        tup[slotMod]      = rel[i];
+    for (i = 0; i < num_tuples; i++) {
+        uint32_t idx = HASH_BIT_MODULO(rel[i].key, MASK, R);
+        uint32_t slot = buffer[idx].data.slot;
+        tuple_t *tup = (tuple_t *) (buffer + idx);
+        uint32_t slotMod = (slot) & (TUPLESPERCACHELINE - 1);
+        tup[slotMod] = rel[i];
 
-        if(slotMod == (TUPLESPERCACHELINE-1)){
+        if (slotMod == (TUPLESPERCACHELINE - 1)) {
             /* write out 64-Bytes with non-temporal store */
-            store_nontemp_64B((tmp+slot-(TUPLESPERCACHELINE-1)), (buffer+idx));
+            store_nontemp_64B((tmp + slot - (TUPLESPERCACHELINE - 1)), (buffer + idx));
             /* writes += TUPLESPERCACHELINE; */
         }
 
-        buffer[idx].data.slot = slot+1;
+        buffer[idx].data.slot = slot + 1;
     }
     /* _mm_sfence (); */
 
     /* write out the remainders in the buffer */
-    for(i = 0; i < fanOut; i++ ) {
-        uint32_t slot  = buffer[i].data.slot;
-        uint32_t sz    = (slot) & (TUPLESPERCACHELINE - 1);
-        slot          -= sz;
-        for(j = 0; j < sz; j++) {
-            tmp[slot]  = buffer[i].data.tuples[j];
-            slot ++;
+    for (i = 0; i < fanOut; i++) {
+        uint32_t slot = buffer[i].data.slot;
+        uint32_t sz = (slot) & (TUPLESPERCACHELINE - 1);
+        slot -= sz;
+        for (j = 0; j < sz; j++) {
+            tmp[slot] = buffer[i].data.tuples[j];
+            slot++;
         }
     }
 }
@@ -838,18 +844,16 @@ parallel_radix_partition_optimized(part_t * const part)
  * @return
  */
 void *
-prj_thread(void * param)
-{
-    arg_t_radix * args   = (arg_t_radix*) param;
+prj_thread(void *param) {
+    arg_t_radix *args = (arg_t_radix *) param;
     int32_t my_tid = args->my_tid;
 
     const int fanOut = 1 << (NUM_RADIX_BITS / NUM_PASSES);
     const int R = (NUM_RADIX_BITS / NUM_PASSES);
     const int D = (NUM_RADIX_BITS - (NUM_RADIX_BITS / NUM_PASSES));
-    const int thresh1 = (const int) (MAX((1<<D), (1<<R)) * THRESHOLD1((unsigned long)args->nthreads));
+    const int thresh1 = (const int) (MAX((1 << D), (1 << R)) * THRESHOLD1((unsigned long) args->nthreads));
 
-    if (args->my_tid == 0)
-    {
+    if (args->my_tid == 0) {
         logger(DBG, "NUM_PASSES=%d, RADIX_BITS=%d", NUM_PASSES, NUM_RADIX_BITS);
         logger(DBG, "fanOut = %d, R = %d, D = %d, thresh1 = %d", fanOut, R, D, thresh1);
     }
@@ -858,16 +862,16 @@ prj_thread(void * param)
     int rv = 0;
 
     part_t part;
-    task_t * task;
-    task_queue_t * part_queue;
-    task_queue_t * join_queue;
+    task_t *task;
+    task_queue_t *part_queue;
+    task_queue_t *join_queue;
 #ifdef SKEW_HANDLING
     task_queue_t * skew_queue;
 #endif
 
-    int32_t * outputR = (int32_t *) calloc((fanOut+1), sizeof(int32_t));
-    int32_t * outputS = (int32_t *) calloc((fanOut+1), sizeof(int32_t));
-    malloc_check((void*)(outputR && outputS));
+    int32_t *outputR = (int32_t *) calloc((fanOut + 1), sizeof(int32_t));
+    int32_t *outputS = (int32_t *) calloc((fanOut + 1), sizeof(int32_t));
+    malloc_check((void *) (outputR && outputS));
 
     part_queue = args->part_queue;
     join_queue = args->join_queue;
@@ -895,7 +899,7 @@ prj_thread(void * param)
     SYNC_TIMERS_START(args, my_tid);
 
 #ifndef RADIX_NO_TIMING
-    if(my_tid == 0){
+    if (my_tid == 0) {
         /* thread-0 checkpoints the time */
         ocall_get_system_micros(&args->start);
         ocall_startTimer(&args->timer1);
@@ -906,19 +910,19 @@ prj_thread(void * param)
 #endif
 
     /********** 1st pass of multi-pass partitioning ************/
-    part.R       = 0;
-    part.D       = NUM_RADIX_BITS / NUM_PASSES;
+    part.R = 0;
+    part.D = NUM_RADIX_BITS / NUM_PASSES;
     part.thrargs = args;
     part.padding = PADDING_TUPLES;
 
     /* 1. partitioning for relation R */
-    part.rel          = args->relR;
-    part.tmp          = args->tmpR;
-    part.hist         = args->histR;
-    part.output       = outputR;
-    part.num_tuples   = args->numR;
+    part.rel = args->relR;
+    part.tmp = args->tmpR;
+    part.hist = args->histR;
+    part.output = outputR;
+    part.num_tuples = args->numR;
     part.total_tuples = args->totalR;
-    part.relidx       = 0;
+    part.relidx = 0;
 
 #ifdef USE_SWWC_OPTIMIZED_PART
     logger(DBG, "Use SSWC optimized part");
@@ -928,13 +932,13 @@ prj_thread(void * param)
 #endif
 
     /* 2. partitioning for relation S */
-    part.rel          = args->relS;
-    part.tmp          = args->tmpS;
-    part.hist         = args->histS;
-    part.output       = outputS;
-    part.num_tuples   = args->numS;
+    part.rel = args->relS;
+    part.tmp = args->tmpS;
+    part.hist = args->histS;
+    part.output = outputS;
+    part.num_tuples = args->numS;
     part.total_tuples = args->totalS;
-    part.relidx       = 1;
+    part.relidx = 1;
 
 #ifdef USE_SWWC_OPTIMIZED_PART
     parallel_radix_partition_optimized(&part);
@@ -949,10 +953,10 @@ prj_thread(void * param)
     /********** end of 1st partitioning phase ******************/
 
     /* 3. first thread creates partitioning tasks for 2nd pass */
-    if(my_tid == 0) {
-        for(i = 0; i < fanOut; i++) {
-            int32_t ntupR = outputR[i+1] - outputR[i] - (int32_t) PADDING_TUPLES;
-            int32_t ntupS = outputS[i+1] - outputS[i] - (int32_t) PADDING_TUPLES;
+    if (my_tid == 0) {
+        for (i = 0; i < fanOut; i++) {
+            int32_t ntupR = outputR[i + 1] - outputR[i] - (int32_t) PADDING_TUPLES;
+            int32_t ntupS = outputS[i + 1] - outputS[i] - (int32_t) PADDING_TUPLES;
 
 #ifdef SKEW_HANDLING
             if(ntupR > thresh1 || ntupS > thresh1){
@@ -972,8 +976,8 @@ prj_thread(void * param)
             }
             else
 #endif
-            if(ntupR > 0 && ntupS > 0) {
-                task_t * t = task_queue_get_slot(part_queue);
+            if (ntupR > 0 && ntupS > 0) {
+                task_t *t = task_queue_get_slot(part_queue);
 
                 t->relR.num_tuples = t->tmpR.num_tuples = ntupR;
                 t->relR.tuples = args->tmpR + outputR[i];
@@ -1005,20 +1009,26 @@ prj_thread(void * param)
     /************ 2nd pass of multi-pass partitioning ********************/
     /* 4. now each thread further partitions and add to join task queue **/
 
-#if NUM_PASSES==1
+#if NUM_PASSES == 1
     /* If the partitioning is single pass we directly add tasks from pass-1 */
     task_queue_t * swap = join_queue;
     join_queue = part_queue;
     /* part_queue is used as a temporary queue for handling skewed parts */
     part_queue = swap;
 
-#elif NUM_PASSES==2
-
-    while((task = task_queue_get_atomic(part_queue))){
-
-        serial_radix_partition(task, join_queue, R, D);
+#elif NUM_PASSES == 2
+#ifdef TIME_MUTEX
+    while((task = task_queue_get_atomic_timed(part_queue,args->cpu_counter_mutex))){
+                serial_radix_partition(task, join_queue, R, D,args->cpu_counter_mutex);
 
     }
+#else
+    while ((task = task_queue_get_atomic(part_queue))) {
+        serial_radix_partition(task, join_queue, R, D);
+    }
+
+#endif
+
 
 #else
 #warning Only 2-pass partitioning is implemented, set NUM_PASSES to 2!
@@ -1160,15 +1170,13 @@ prj_thread(void * param)
     SYNC_GLOBAL_STOP(&args->globaltimer->sync4, my_tid);
 
 #ifndef RADIX_NO_TIMING
-    if(my_tid == 0)
-    {
+    if (my_tid == 0) {
         ocall_stopTimer(&args->pass2);
         ocall_stopTimer(&args->timer3);/* partitioning finished */
     }
 #endif
 
-    if(my_tid == 0)
-    {
+    if (my_tid == 0) {
         logger(ENCLAVE, "Number of join tasks = %d", join_queue->count);
     }
 
@@ -1180,15 +1188,19 @@ prj_thread(void * param)
     barrier_arrive(args->barrier, rv);
 #endif
 
-    output_list_t * output;
+    output_list_t *output;
+#ifdef TIME_MUTEX
+    while((task = task_queue_get_atomic_timed(join_queue,args->cpu_counter_mutex))){
+#else
+    while ((task = task_queue_get_atomic(join_queue))) {
+#endif
 
-    while((task = task_queue_get_atomic(join_queue))){
         /* do the actual join. join method differs for different algorithms,
            i.e. bucket chaining, histogram-based, histogram-based with simd &
            prefetching  */
         results += args->join_function(&task->relR, &task->relS, &task->tmpR, &output);
 
-        args->parts_processed ++;
+        args->parts_processed++;
     }
 
     args->result = results;
@@ -1205,7 +1217,7 @@ prj_thread(void * param)
 #ifndef RADIX_NO_TIMING
     /* this is for just reliable timing of finish time */
     barrier_arrive(args->barrier, rv);
-    if(my_tid == 0) {
+    if (my_tid == 0) {
         /* Actually with this setup we're not timing build */
         ocall_stopTimer(&args->timer2);/* build finished */
         ocall_stopTimer(&args->timer1);/* probe finished */
@@ -1234,44 +1246,53 @@ prj_thread(void * param)
  * - PRH,  Parallel Radix Join Histogram-based --> histogram_join()
  * - PRHO, Parallel Radix Histogram-based Optimized -> histogram_optimized_join()
  */
+#ifdef TIME_MUTEX
 result_t *
-join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int nthreads)
+join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int nthreads, uint64_t * cpu_cntr)
 {
+#else
+
+result_t *
+join_init_run(struct table_t *relR, struct table_t *relS, JoinFunction jf, int nthreads) {
+#endif
+
     int i, rv;
     pthread_t tid[nthreads];
     pthread_barrier_t barrier;
 //    cpu_set_t set;
     arg_t_radix args[nthreads];
-
-    int32_t ** histR, ** histS;
-    struct row_t * tmpRelR, * tmpRelS;
+#ifdef TIME_MUTEX
+    uint64_t cpu_cntr_threads[nthreads];
+#endif
+    int32_t **histR, **histS;
+    struct row_t *tmpRelR, *tmpRelS;
     uint64_t numperthr[2];
     int64_t result = 0;
 
-    task_queue_t * part_queue, * join_queue;
+    task_queue_t *part_queue, *join_queue;
 #ifdef SKEW_HANDLING
     task_queue_t * skew_queue;
     task_t * skewtask = NULL;
     skew_queue = task_queue_init(FANOUT_PASS1);
 #endif
     part_queue = task_queue_init(FANOUT_PASS1);
-    join_queue = task_queue_init((1<<NUM_RADIX_BITS));
+    join_queue = task_queue_init((1 << NUM_RADIX_BITS));
 
 
     /* allocate temporary space for partitioning */
-    tmpRelR = (struct row_t*) alloc_aligned(relR->num_tuples * sizeof(struct row_t) +
-                                            RELATION_PADDING);
-    tmpRelS = (struct row_t*) alloc_aligned(relS->num_tuples * sizeof(struct row_t) +
-                                            RELATION_PADDING);
-    malloc_check((void*)(tmpRelR && tmpRelS));
+    tmpRelR = (struct row_t *) alloc_aligned(relR->num_tuples * sizeof(struct row_t) +
+                                             RELATION_PADDING);
+    tmpRelS = (struct row_t *) alloc_aligned(relS->num_tuples * sizeof(struct row_t) +
+                                             RELATION_PADDING);
+    malloc_check((void *) (tmpRelR && tmpRelS));
 
     /* allocate histograms arrays, actual allocation is local to threads */
-    histR = (int32_t**) alloc_aligned(nthreads * sizeof(int32_t*));
-    histS = (int32_t**) alloc_aligned(nthreads * sizeof(int32_t*));
-    malloc_check((void*)(histR && histS));
+    histR = (int32_t **) alloc_aligned(nthreads * sizeof(int32_t *));
+    histS = (int32_t **) alloc_aligned(nthreads * sizeof(int32_t *));
+    malloc_check((void *) (histR && histS));
 
     rv = pthread_barrier_init(&barrier, NULL, nthreads);
-    if(rv != 0){
+    if (rv != 0) {
         logger(ERROR, "Couldn't create the barrier");
         ocall_exit(EXIT_FAILURE);
     }
@@ -1286,12 +1307,12 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
     numperthr[0] = relR->num_tuples / nthreads;
     numperthr[1] = relS->num_tuples / nthreads;
 
-    result_t * joinresult;
+    result_t *joinresult;
     joinresult = (result_t *) malloc(sizeof(result_t));
     joinresult->resultlist = (threadresult_t *) malloc(sizeof(threadresult_t)
                                                        * nthreads);
 
-    for(i = 0; i < nthreads; i++){
+    for (i = 0; i < nthreads; i++) {
         args[i].relR = relR->tuples + i * numperthr[0];
         args[i].tmpR = tmpRelR;
         args[i].histR = histR;
@@ -1300,9 +1321,9 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
         args[i].tmpS = tmpRelS;
         args[i].histS = histS;
 
-        args[i].numR = (i == (nthreads-1)) ?
+        args[i].numR = (i == (nthreads - 1)) ?
                        (relR->num_tuples - i * numperthr[0]) : numperthr[0];
-        args[i].numS = (i == (nthreads-1)) ?
+        args[i].numS = (i == (nthreads - 1)) ?
                        (relS->num_tuples - i * numperthr[1]) : numperthr[1];
         args[i].totalR = relR->num_tuples;
         args[i].totalS = relS->num_tuples;
@@ -1317,7 +1338,12 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
         args[i].barrier = &barrier;
         args[i].join_function = jf;
         args[i].nthreads = nthreads;
+#ifdef TIME_MUTEX
+        args[i].cpu_counter_mutex = cpu_cntr_threads + i;
+        *(args[i].cpu_counter_mutex) = 0;
 
+
+#endif
 #ifdef JOIN_MATERIALIZE
         args[i].threadresult        = &(joinresult->resultlist[i]);
 #endif
@@ -1327,22 +1353,25 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
         logger(DBG, "Assigning thread-%d to CPU-%d", i, cpu_idx);
         rv = pthread_create_cpuidx(&tid[i], NULL, cpu_idx, prj_thread, (void*)&args[i]);
 #else
-        rv = pthread_create(&tid[i], nullptr, prj_thread, (void*)&args[i]);
+        rv = pthread_create(&tid[i], nullptr, prj_thread, (void *) &args[i]);
 #endif
-        if (rv){
+        if (rv) {
             logger(ERROR, "return code from pthread_create() is %d\n", rv);
             ocall_exit(-1);
         }
     }
 
     /* wait for threads to finish */
-    for(i = 0; i < nthreads; i++){
+    for (i = 0; i < nthreads; i++) {
         pthread_join(tid[i], NULL);
         result += args[i].result;
+#ifdef TIME_MUTEX
+        *cpu_cntr += cpu_cntr_threads[i];
+#endif
     }
 
     joinresult->totalresults = result;
-    joinresult->nthreads     = nthreads;
+    joinresult->nthreads = nthreads;
 
 #ifdef SYNCSTATS
     /* #define ABSDIFF(X,Y) (((X) > (Y)) ? ((X)-(Y)) : ((Y)-(X))) */
@@ -1376,7 +1405,7 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
 #endif
 
     /* clean up */
-    for(i = 0; i < nthreads; i++) {
+    for (i = 0; i < nthreads; i++) {
         free(histR[i]);
         free(histS[i]);
     }
@@ -1396,10 +1425,9 @@ join_init_run(struct table_t * relR, struct table_t * relS, JoinFunction jf, int
     return joinresult;
 }
 
-result_t*
-RJ (struct table_t * relR, struct table_t * relS, int nthreads)
-{
-    (void)(nthreads);
+result_t *
+RJ(struct table_t *relR, struct table_t *relS, int nthreads) {
+    (void) (nthreads);
     int64_t result = 0;
     uint64_t i;
 
@@ -1410,17 +1438,17 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
 
     struct table_t *outRelR, *outRelS;
 
-    outRelR = (struct table_t*) malloc(sizeof(struct table_t));
-    outRelS = (struct table_t*) malloc(sizeof(struct table_t));
+    outRelR = (struct table_t *) malloc(sizeof(struct table_t));
+    outRelS = (struct table_t *) malloc(sizeof(struct table_t));
 
     /* allocate temporary space for partitioning */
     /* TODO: padding problem */
     size_t sz = relR->num_tuples * sizeof(row_t) + RELATION_PADDING;
-    outRelR->tuples     = (row_t*) malloc(sz);
+    outRelR->tuples = (row_t *) malloc(sz);
     outRelR->num_tuples = relR->num_tuples;
 
     sz = relS->num_tuples * sizeof(row_t) + RELATION_PADDING;
-    outRelS->tuples     = (row_t*) malloc(sz);
+    outRelS->tuples = (row_t *) malloc(sz);
     outRelS->num_tuples = relS->num_tuples;
 
 #ifndef RADIX_NO_TIMING
@@ -1435,7 +1463,7 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
 #endif
 
     /***** do the multi-pass partitioning *****/
-#if NUM_PASSES==1
+#if NUM_PASSES == 1
     /* apply radix-clustering on relation R for pass-1 */
     radix_cluster_nopadding(outRelR, relR, 0, NUM_RADIX_BITS);
     relR = outRelR;
@@ -1444,22 +1472,22 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
     radix_cluster_nopadding(outRelS, relS, 0, NUM_RADIX_BITS);
     relS = outRelS;
 
-#elif NUM_PASSES==2
+#elif NUM_PASSES == 2
     /* apply radix-clustering on relation R for pass-1 */
-    radix_cluster_nopadding(outRelR, relR, 0, NUM_RADIX_BITS/NUM_PASSES);
+    radix_cluster_nopadding(outRelR, relR, 0, NUM_RADIX_BITS / NUM_PASSES);
 
     /* apply radix-clustering on relation S for pass-1 */
-    radix_cluster_nopadding(outRelS, relS, 0, NUM_RADIX_BITS/NUM_PASSES);
+    radix_cluster_nopadding(outRelS, relS, 0, NUM_RADIX_BITS / NUM_PASSES);
 
     /* apply radix-clustering on relation R for pass-2 */
     radix_cluster_nopadding(relR, outRelR,
-                            NUM_RADIX_BITS/NUM_PASSES,
-                            NUM_RADIX_BITS-(NUM_RADIX_BITS/NUM_PASSES));
+                            NUM_RADIX_BITS / NUM_PASSES,
+                            NUM_RADIX_BITS - (NUM_RADIX_BITS / NUM_PASSES));
 
     /* apply radix-clustering on relation S for pass-2 */
     radix_cluster_nopadding(relS, outRelS,
-                            NUM_RADIX_BITS/NUM_PASSES,
-                            NUM_RADIX_BITS-(NUM_RADIX_BITS/NUM_PASSES));
+                            NUM_RADIX_BITS / NUM_PASSES,
+                            NUM_RADIX_BITS - (NUM_RADIX_BITS / NUM_PASSES));
 
     /* clean up temporary relations */
     free(outRelR->tuples);
@@ -1480,17 +1508,17 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
     ocall_stopTimer(&timer3);
 #endif
 
-    uint64_t * R_count_per_cluster = (uint64_t*)calloc((1<<NUM_RADIX_BITS), sizeof(uint64_t));
-    uint64_t * S_count_per_cluster = (uint64_t*)calloc((1<<NUM_RADIX_BITS), sizeof(uint64_t));
+    uint64_t *R_count_per_cluster = (uint64_t *) calloc((1 << NUM_RADIX_BITS), sizeof(uint64_t));
+    uint64_t *S_count_per_cluster = (uint64_t *) calloc((1 << NUM_RADIX_BITS), sizeof(uint64_t));
 
     /* compute number of tuples per cluster */
-    for( i=0; i < relR->num_tuples; i++ ){
-        uint32_t idx = (relR->tuples[i].key) & ((1<<NUM_RADIX_BITS)-1);
-        R_count_per_cluster[idx] ++;
+    for (i = 0; i < relR->num_tuples; i++) {
+        uint32_t idx = (relR->tuples[i].key) & ((1 << NUM_RADIX_BITS) - 1);
+        R_count_per_cluster[idx]++;
     }
-    for( i=0; i < relS->num_tuples; i++ ){
-        uint32_t idx = (relS->tuples[i].key) & ((1<<NUM_RADIX_BITS)-1);
-        S_count_per_cluster[idx] ++;
+    for (i = 0; i < relS->num_tuples; i++) {
+        uint32_t idx = (relS->tuples[i].key) & ((1 << NUM_RADIX_BITS) - 1);
+        S_count_per_cluster[idx]++;
     }
 
 //#ifdef JOIN_RESULT_MATERIALIZE
@@ -1502,10 +1530,10 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
     /* build hashtable on inner */
     int r, s; /* start index of next clusters */
     r = s = 0;
-    for( i=0; i < (1<<NUM_RADIX_BITS); i++ ){
+    for (i = 0; i < (1 << NUM_RADIX_BITS); i++) {
         struct table_t tmpR, tmpS;
 
-        if(R_count_per_cluster[i] > 0 && S_count_per_cluster[i] > 0){
+        if (R_count_per_cluster[i] > 0 && S_count_per_cluster[i] > 0) {
 
             tmpR.num_tuples = R_count_per_cluster[i];
             tmpR.tuples = relR->tuples + r;
@@ -1516,8 +1544,7 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
             s += S_count_per_cluster[i];
 
             result += bucket_chaining_join(&tmpR, &tmpS, NULL, nullptr);
-        }
-        else {
+        } else {
             r += R_count_per_cluster[i];
             s += S_count_per_cluster[i];
         }
@@ -1533,7 +1560,7 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
     ocall_stopTimer(&timer1);/* probe finished */
     ocall_get_system_micros(&end);
     /* now print the timing results: */
-    print_timing(timer1, timer2, timer3, relR->num_tuples + relS->num_tuples, result, start, end, 0 ,0);
+    print_timing(timer1, timer2, timer3, relR->num_tuples + relS->num_tuples, result, start, end, 0, 0);
 #endif
 
     /* clean-up temporary buffers */
@@ -1548,28 +1575,41 @@ RJ (struct table_t * relR, struct table_t * relS, int nthreads)
     free(outRelS);
 #endif
 
-    result_t * joinresult;
+    result_t *joinresult;
     joinresult = (result_t *) malloc(sizeof(result_t));
     joinresult->totalresults = result;
     joinresult->nthreads = 1;
     return joinresult;
 }
 
+#ifdef TIME_MUTEX
 result_t*
-RHO (struct table_t * relR, struct table_t * relS, int nthreads)
+RHO (struct table_t * relR, struct table_t * relS, int nthreads,uint64_t * cpu_cntr)
 {
+    return join_init_run(relR, relS, bucket_chaining_join, nthreads,cpu_cntr);
+}
+
+result_t*
+RHT (relation_t * relR, relation_t * relS, int nthreads,uint64_t * cpu_cntr)
+{
+    return join_init_run(relR, relS, histogram_join, nthreads,cpu_cntr);
+}
+#else
+
+result_t *
+RHO(struct table_t *relR, struct table_t *relS, int nthreads) {
     return join_init_run(relR, relS, bucket_chaining_join, nthreads);
 }
 
-result_t*
-RHT (relation_t * relR, relation_t * relS, int nthreads)
-{
+result_t *
+RHT(relation_t *relR, relation_t *relS, int nthreads) {
     return join_init_run(relR, relS, histogram_join, nthreads);
 }
 
-result_t*
-RHO_seal_buffer (relation_t * relR, relation_t * relS, int nthreads)
-{
+result_t *
+RHO_seal_buffer(relation_t *relR, relation_t *relS, int nthreads) {
     logger(DBG, "Sealing buffer number of records = %d", SEAL_BUF_RECORDS);
     return join_init_run(relR, relS, bucket_chaining_join_with_sealing_buffer, nthreads);
 }
+
+#endif

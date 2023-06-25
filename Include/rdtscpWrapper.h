@@ -30,6 +30,36 @@ public:
 
 };
 
-
+/*
+class rdtscpCounter{
+private:
+    uint64_t cntr;
+    uint32_t aux;
+    uint64_t start;
+    uint64_t end;
+    bool paused;
+public:
+    rdtscpCounter(){
+        cntr = 0;
+        start = 0;
+    }
+    void start(){
+        paused = false;
+        start = rdtscp(aux);
+    }
+    uint64_t stop(){
+        cntr += rdtscp(aux) - start;
+        return cntr;
+    }
+    void pause(){
+        cntr += rdtscp(aux) - start;
+        paused = true;
+    }
+    void reset(){
+        start = 0;
+        cntr = 0;
+    }
+};
+*/
 #endif //SGX_ENCRYPTEDDB_RDTSCPWRAPPER_H
 

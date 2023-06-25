@@ -1,9 +1,9 @@
 #ifndef SGXJOINEVALUATION_PCM_COMMONS_H
 #define SGXJOINEVALUATION_PCM_COMMONS_H
 
-#include "cpucounters.h"
 
 #ifdef PCM_COUNT
+#include "cpucounters.h"
 using namespace pcm;
 void ensurePmuNotBusy(PCM *m, bool forcedProgramming);
 #endif

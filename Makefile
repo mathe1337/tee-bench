@@ -278,7 +278,7 @@ native:
  		-IJoins/oblidb -Ilib/pcm/src/ -IJoins/psm -IJoins/mcjoin -IJoins/mway \
 		$(wildcard App/Lib/*.cpp) $(wildcard App/Lib/*.c) $(INCLUDE_SOURCES_CPP) $(INCLUDE_SOURCES_C) \
 		native.cpp $(JOIN_SOURCES_C) $(JOIN_SOURCES_CPP) \
-		-O3 -o app -lssl -lcrypto -lpthread -ldl $(PCM_LINK) -DNATIVE_COMPILATION
+		-O3 -o app -lssl -lcrypto -lpthread -ldl $(PCM_LINK) -fopenmp -DNATIVE_COMPILATION
 
 .config_$(Build_Mode)_$(SGX_ARCH):
 	@rm -f .config_* $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.*

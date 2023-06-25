@@ -250,9 +250,11 @@ result_t* rhobli_join (struct table_t *relR, struct table_t *relS, int nthreads)
             }
             //logger(DBG," S = <%d, %d>  (%d items)", j, j+items, items);
             Sn->num_tuples = items;
+#ifndef TIME_MUTEX
             result_t *res = join_init_run(Rn, Sn, oblivious_bucket_chaining_join, 1);
 //            logger(INFO, "Partial result %lu matches", res->totalresults);
             total_result += res->totalresults;
+#endif
             //logger(DBG,"partial result = %d", res->totalresults);
         }
 

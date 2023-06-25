@@ -13,8 +13,9 @@ PROG = ' ./app '
 def get_all_algorithms():
     return ["CHT", "INL", "PHT", "PSM", "RHO", "RHT", "RSM"]
 
+
 def get_all_algorithms_extended():
-    return ["CHT", 'INL' ,"MWAY", "PHT", "PSM", "RHT", "RHO", "RSM"]
+    return ["CHT", 'INL', "MWAY", "PHT", "PSM", "RHT", "RHO", "RSM"]
 
 
 def get_test_dataset_names():
@@ -30,7 +31,7 @@ def start_timer():
 
 
 def stop_timer(start):
-    print("Execution time: " + str(timedelta(seconds=(timer()-start))))
+    print("Execution time: " + str(timedelta(seconds=(timer() - start))))
 
 
 def escape_ansi(line):
@@ -58,7 +59,7 @@ def compile_app(mode: str, flags=None, enclave_config_file=None, debug=False):
     if mode == 'native-materialize':
         cflags += ' -DNATIVE_COMPILATION -DJOIN_MATERIALIZE '
 
-    if mode == 'sgx-materialize' or mode == 'sgx-seal' or mode =='sgx-chunk-buffer':
+    if mode == 'sgx-materialize' or mode == 'sgx-seal' or mode == 'sgx-chunk-buffer':
         cflags += ' -DJOIN_MATERIALIZE '
 
     if mode == 'sgx-affinity':
@@ -74,10 +75,11 @@ def compile_app(mode: str, flags=None, enclave_config_file=None, debug=False):
 
     print("Make " + mode + " enclave " + enclave_string + " with flags " + cflags)
     if debug:
-        subprocess.check_output(["make", '-B' , exec_mode, 'SGX_DEBUG=1', 'SGX_PRERELEASE=0',
-                                      enclave_string, cflags], cwd="../../", stderr=subprocess.DEVNULL)
+        subprocess.check_output(["make", '-B', exec_mode, 'SGX_DEBUG=1', 'SGX_PRERELEASE=0',
+                                 enclave_string, cflags], cwd="../../", stderr=subprocess.DEVNULL)
     else:
-        subprocess.check_output(["make", "-B", exec_mode, enclave_string, cflags], cwd="../../", stderr=subprocess.DEVNULL)
+        subprocess.check_output(["make", "-B", exec_mode, enclave_string, cflags], cwd="../../",
+                                stderr=subprocess.DEVNULL)
 
 
 def make_app_radix_bits(sgx: bool, perf_counters: bool, num_passes: int, num_radix_bits: int):
@@ -132,6 +134,7 @@ def init_file(fname, first_line):
     f.write(first_line)
     f.close()
 
+
 ##############
 # colors:
 #
@@ -170,29 +173,29 @@ def init_file(fname, first_line):
 
 def color_alg(alg):
     # colors = {"CHT":"#e068a4", "PHT":"#829e58", "RHO":"#5ba0d0"}
-    colors = {"CHT":"#b44b20", # burnt sienna
-              "PHT":"#7b8b3d", # avocado
-              "PSM":"#c7b186", # natural
-              "RHT":"#885a20", # teak
-              "RHO":"#e6ab48", # harvest gold
-              "RSM":"#4c748a", # blue mustang
-              "OJ":"#fd2455",
-              "OPAQ":"#c77dd4",
-              "OBLI":"#3b6bc6",
-              "INL":'#7620b4',
-              'NL':'#20b438',
-              'MWAY':'#fd2455',
-              'GHJ':'black',
-              'RHO_atomic':'deeppink',
-              'CRKJ':'dodgerblue',
-              'CRKJ_CHT':'deeppink',
-              'oldCRKJ':"#7b8b3d", # avocado
-              'CRKJ_static':"#4c748a", # blue mustang
+    colors = {"CHT": "#b44b20",  # burnt sienna
+              "PHT": "#7b8b3d",  # avocado
+              "PSM": "#c7b186",  # natural
+              "RHT": "#885a20",  # teak
+              "RHO": "#e6ab48",  # harvest gold
+              "RSM": "#4c748a",  # blue mustang
+              "OJ": "#fd2455",
+              "OPAQ": "#c77dd4",
+              "OBLI": "#3b6bc6",
+              "INL": '#7620b4',
+              'NL': '#20b438',
+              'MWAY': '#fd2455',
+              'GHJ': 'black',
+              'RHO_atomic': 'deeppink',
+              'CRKJ': 'dodgerblue',
+              'CRKJ_CHT': 'deeppink',
+              'oldCRKJ': "#7b8b3d",  # avocado
+              'CRKJ_static': "#4c748a",  # blue mustang
 
               'RHO-sgx': '#e6ab48',
-              'RHO-sgx-affinity':'g',
-              'RHO-lockless':'deeppink',
-              'RHO_atomic-sgx':'deeppink'}
+              'RHO-sgx-affinity': 'g',
+              'RHO-lockless': 'deeppink',
+              'RHO_atomic-sgx': 'deeppink'}
     # colors = {"CHT":"g", "PHT":"deeppink", "RHO":"dodgerblue"}
     return colors[alg]
 
@@ -208,14 +211,14 @@ def marker_alg(alg):
         "INL": '^',
         'MWAY': '*',
         'RHO_atomic': 'P',
-        'CRKJ':'>',
-        'CRKJ_CHT':'^',
-        'oldCRKJ':'X',
+        'CRKJ': '>',
+        'CRKJ_CHT': '^',
+        'oldCRKJ': 'X',
         'CRKJ_static': 'D',
 
         'RHO-sgx': 'X',
-        'RHO-lockless':'h',
-        'RHO_atomic-sgx':'h'
+        'RHO-lockless': 'h',
+        'RHO_atomic-sgx': 'h'
     }
     return markers[alg]
 
@@ -230,7 +233,7 @@ def savefig(filename, font_size=15, tight_layout=True):
     plt.rcParams.update({'font.size': font_size})
     if tight_layout:
         plt.tight_layout()
-    plt.savefig(filename, transparent = False, bbox_inches = 'tight', pad_inches = 0.1, dpi=200)
+    plt.savefig(filename, transparent=False, bbox_inches='tight', pad_inches=0.1, dpi=200)
     print("Saved image file: " + filename)
 
 

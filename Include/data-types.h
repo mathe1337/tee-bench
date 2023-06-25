@@ -67,7 +67,11 @@ struct output_t {
 
 typedef struct algorithm_t {
     char name[128];
+#ifdef TIME_MUTEX
+    result_t *  (*join)(struct table_t*, struct table_t*, int, uint64_t*);
+#else
     result_t *  (*join)(struct table_t*, struct table_t*, int);
+#endif
 } algorithm_t;
 
 /** Holds the join results of a thread */

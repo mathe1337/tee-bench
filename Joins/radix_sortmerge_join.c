@@ -98,8 +98,15 @@ int64_t sortmerge_join(const struct table_t * const R,
     matches =  merge(R, S);
     return matches;
 }
-
+#ifdef TIME_MUTEX
+result_t* RSM (struct table_t * relR, struct table_t * relS, int nthreads, uint64_t * cpu_cntr)
+{
+    return join_init_run(relR, relS, sortmerge_join, nthreads,cpu_cntr);
+}
+#else
 result_t* RSM (struct table_t * relR, struct table_t * relS, int nthreads)
 {
     return join_init_run(relR, relS, sortmerge_join, nthreads);
 }
+#endif
+

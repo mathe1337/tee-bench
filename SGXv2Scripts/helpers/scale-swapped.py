@@ -16,13 +16,13 @@ filename2 = "../data/scale-r-sgx-output.csv"
 mb_of_data = 131072
 
 
-def run_join(prog, alg, size_r, size_s, threads, reps, mode, location):
-    f = open("../data/scale-r-sgx-" + location + "-output_correct.csv", "a")
+def run_join(prog, alg, size_r, size_s, threads, reps, mode):
+    f = open("../data/scale-" + mode + "-output_correct.csv", "a")
     results = []
     ewbs = []
     for i in range(0, reps):
         stdout = subprocess.check_output(prog + " -a " + alg + " -r " + str(size_r) + " -s " + str(size_s) +
-                                         " -n " + str(threads) + " -m " + location, cwd="../../", shell=True) \
+                                         " -n " + str(threads) , cwd="../../", shell=True) \
             .decode('utf-8')
         for line in stdout.splitlines():
             if "Throughput" in line:
@@ -60,22 +60,21 @@ if __name__ == '__main__':
             if opt in ('-r', '--reps'):
                 config['reps'] = int(arg)
 
-    mode = "sgx"
     max_r_size_mb = 2500
     s_sizes = [1 * mb_of_data,  # 1MB
                16 * mb_of_data,  # 16 MB
                28 * mb_of_data,  # 28 MB
                512 * mb_of_data]  # 512 MB
-    for l in ['preload']:
-        filename = "../data/scale-r-sgx-" + l + "-output_correct.csv"
+    for mode in ['sgx','native']:
+        filename = "../data/scale-" + mode + "-output_correct.csv"
         if config['experiment']:
             commons.compile_app(mode, enclave_config_file='Enclave/Enclave11GB.config.xml')  # , flags=["SGX_COUNTERS"])
             commons.remove_file(filename)
             commons.init_file(filename, "mode,alg,threads,sizeR,sizeS,throughput,ewb\n")
 
             for s_size in s_sizes:
-                for alg in commons.get_all_algorithms_extended():
+                for alg in ['INL']:
                     for i in range(500, max_r_size_mb + 1, 500):  # range(50, max_r_size_mb + 1, 50):
-                        run_join(commons.PROG, alg, s_size, i * mb_of_data, config['threads'], config['reps'], mode, l)
+                        run_join(commons.PROG, alg,  i * mb_of_data,s_size, config['threads'], config['reps'], mode)
 
         commons.stop_timer(timer)

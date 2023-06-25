@@ -6,16 +6,8 @@
 #include "cpu_mapping.h"
 #include "Logger.h"
 
-static inline u_int64_t rdtsc(void)
-{
-    u_int32_t hi, lo;
 
-    __asm__ __volatile__("rdtsc"
-    : "=a"(lo), "=d"(hi));
-
-    return (u_int64_t(hi) << 32) | u_int64_t(lo);
-}
-
+/*
 void ocall_startTimer(uint64_t* t)
 {
     *t = rdtsc();
@@ -25,7 +17,7 @@ void ocall_stopTimer(uint64_t* t)
 {
     *t = rdtsc() - *t;
 }
-
+*/
 void ocall_getrusage()
 {
     struct rusage usage;
